@@ -1,0 +1,82 @@
+.fight-history-table span {
+    font-weight: bold;
+}
+
+.fight-history-table span[style*="color: green"] {
+    color: green;
+}
+
+.fight-history-table span[style*="color: red"] {
+    color: red;
+}
+
+.fight-history-table td {
+    text-align: center;
+    padding: 10px;
+}
+
+
+/* Fighter Profile Card */
+.fighter-profile-card {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px 20px;
+    background-color: #f4f4f9;
+}
+
+.fighter-card-container {
+    display: flex;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    max-width: 700px;
+    width: 100%;
+}
+
+/* Fighter Photo */
+.fighter-photo {
+    flex: 1;
+    background-color: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+}
+.fighter-photo img {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    border-radius: 10px 0 0 10px;
+}
+
+/* Fighter Information */
+.fighter-info {
+    flex: 2;
+    padding: 20px;
+    text-align: left;
+    background-color: #fff;
+}
+.fighter-info h1 {
+    margin-bottom: 15px;
+    font-size: 2rem;
+    color: #333;
+    border-bottom: 2px solid #FF4742;
+    display: inline-block;
+    padding-bottom: 5px;
+}
+.fighter-stats {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    line-height: 1.8;
+}
+.fighter-stats li {
+    font-size: 1.1rem;
+    color: #555;
+}
+.fighter-stats li strong {
+    color: #FF4742;
+    margin-right: 10px;
+}

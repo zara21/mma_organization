@@ -1,0 +1,157 @@
+/* General styles for the section */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+}
+
+.history-area {
+    background-color: #fff;
+    padding: 50px 0;
+}
+
+.section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.section-title span {
+    color: #ff0000;
+}
+
+/* Styles for the carousel */
+.carousel-inner {
+    position: relative;
+    width: 100%;
+}
+
+.carousel-item {
+    display: none;
+    transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+.carousel-item.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.carousel-item img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.carousel-item h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.carousel-item p {
+    font-size: 1.2rem;
+    line-height: 1.6;
+    color: #555;
+}
+
+/* Carousel indicators */
+.carousel-indicators {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 0;
+    display: flex;
+    justify-content: center;
+}
+
+.carousel-indicators li {
+    width: 15px;
+    height: 15px;
+    margin: 5px;
+    background-color: #ccc;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.carousel-indicators li.active {
+    background-color: #ff0000;
+}
+
+.carousel-indicators li:hover {
+    background-color: #333;
+}
+
+.carousel-indicators li br {
+    display: none;
+}
+
+.carousel-indicators li::after {
+    content: attr(data-title);
+    display: block;
+    font-size: 0.8rem;
+    color: #555;
+    margin-top: 5px;
+    text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .carousel-item h2 {
+        font-size: 1.5rem;
+    }
+
+    .carousel-item p {
+        font-size: 1rem;
+    }
+
+    .carousel-indicators li::after {
+        font-size: 0.7rem;
+    }
+}
+
+
+.carousel-indicators-container {
+    text-align: center; /* ცენტრში გასწორება */
+    margin: 20px auto; /* სივრცე ზემოთ/ქვემოთ */
+    max-width: 800px; /* მაქსიმალური სიგანე */
+}
+
+.carousel-indicators {
+    display: flex;
+    justify-content: space-around; /* თანაბარი სივრცე უჯრებს შორის */
+    flex-wrap: wrap; /* თუ არ ყოფნის სივრცე, გადადის შემდეგ ხაზზე */
+    padding: 0;
+    margin: 0;
+    list-style: none; /* წერტილების ამოშლა */
+}
+
+.carousel-indicators li {
+    display: inline-block;
+    text-align: center;
+    padding: 10px 15px; /* შიდა სივრცე */
+    margin: 5px; /* გარე სივრცე */
+    background-color: #f8f9fa; /* ღია ფონი */
+    border: 2px solid #ddd; /* საზღვარი */
+    border-radius: 10px; /* მრგვალი კუთხეები */
+    color: #333; /* ტექსტის ფერი */
+    font-size: 16px; /* ზომა */
+    cursor: pointer; /* მაუსის ცვლილება */
+    transition: all 0.3s ease; /* ანიმაცია ცვლილებისთვის */
+}
+
+.carousel-indicators li:hover {
+    background-color: #007bff; /* მაუსის მიტანით ცვლილება */
+    color: white;
+    border-color: #0056b3;
+}
+
+.carousel-indicators li.active {
+    background-color: #dc3545; /* აქტიური ფონი */
+    color: white;
+    font-weight: bold;
+}

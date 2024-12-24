@@ -1,0 +1,94 @@
+
+.page-title {
+    text-align: center;
+    margin: 20px 0;
+    color: #222;
+}
+
+/* Search Form */
+.search-form {
+    display: flex;
+    flex-direction: row;
+    margin: 20px auto;
+    max-width: 600px;
+}
+.search-form input {
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 5px 0 0 5px;
+    flex: 1;
+}
+.search-form button {
+    font-size: 1rem;
+    background-color: #FF4742;
+    color: white;
+    border: none;
+    border-radius: 0 5px 5px 0;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.search-form button:hover {
+    background-color: #e63e3a;
+}
+
+/* Fighters Container */
+.fighters-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 20px;
+}
+
+/* Fighter Card */
+.fighter-card {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    width: 300px;
+    text-align: center;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.fighter-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+.fighter-photo img {
+    width: 100%;
+    margin-left: 55px;
+}
+.fighter-info {
+    padding: 15px;
+}
+.fighter-info h2 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: #222;
+}
+.fighter-info p {
+    font-size: 1rem;
+    margin: 5px 0;
+    color: #555;
+}
+.fighter-info .view-profile {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 15px;
+    font-size: 1rem;
+    background-color: #FF4742;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background 0.3s;
+}
+.fighter-info .view-profile:hover {
+    background-color: #e63e3a;
+}
+
+/* No Results */
+.no-results {
+    text-align: center;
+    font-size: 1.2rem;
+    color: #666;
+    margin-top: 50px;
+}

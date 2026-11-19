@@ -118,6 +118,33 @@ function outcomeBadge(string $outcome): void
     echo '<span class="outcome outcome-' . h(strtolower(str_replace(' ', '-', $outcome))) . '">' . h($outcome) . '</span>';
 }
 
+function fightMethodPicker(string $value, ?string $customText = null): void
+{
+    $isPreset = in_array($value, array_merge(...array_values(FIGHT_METHOD_GROUPS)), true);
+    $isOther = $value !== '' && !$isPreset;
+    $customText ??= $isOther && $value !== CUSTOM_FIGHT_METHOD ? $value : '';
+    ?>
+    <div class="fight-method-picker" data-fight-method-picker>
+        <label>Method
+            <select name="method" data-fight-method>
+                <option value="" <?= $value === '' ? 'selected' : '' ?>>Not specified</option>
+                <?php foreach (FIGHT_METHOD_GROUPS as $group => $methods): ?>
+                    <optgroup label="<?= h($group) ?>">
+                        <?php foreach ($methods as $method): ?>
+                            <option value="<?= h($method) ?>" <?= $value === $method ? 'selected' : '' ?>><?= h($method) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endforeach; ?>
+                <option value="<?= CUSTOM_FIGHT_METHOD ?>" <?= $isOther ? 'selected' : '' ?>>Other (write in)</option>
+            </select>
+        </label>
+        <label data-other-method>Other method or result detail
+            <input name="method_other" maxlength="50" value="<?= h($customText) ?>" placeholder="Describe how the bout ended">
+        </label>
+    </div>
+    <?php
+}
+
 function fighterCard(array $fighter): void
 {
     $photo = media($fighter['photo'], '');

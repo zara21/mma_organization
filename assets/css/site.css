@@ -288,6 +288,20 @@ textarea { resize: vertical; line-height: 1.55; }
 .profile-hero .detail-copy { align-self: center; }
 .profile-hero h1 { font-style: italic; }
 .profile-record { margin-top: 1rem; font: 800 2.8rem/1 var(--display); }
+.method-stats { max-width: 31rem; margin-top: 1.15rem; }
+.method-stats-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .2rem .65rem; margin-bottom: .45rem; }
+.method-stats-heading h2 { font-size: 1.2rem; }
+.method-stats-heading small { font-size: .8rem; }
+.method-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; margin: 0; }
+.method-stat-card { display: grid; align-content: space-between; gap: .45rem; padding: .5rem .45rem; border: 1px solid var(--line); border-radius: 9px; background: var(--raised); text-align: center; }
+.method-stat-card dt { font-size: .875rem; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.method-stat-card dd { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.method-stat-card dd span { display: grid; gap: .16rem; line-height: 1; }
+.method-stat-card dd span + span { border-left: 1px solid var(--line); }
+.method-stat-card dd small { color: var(--muted); font-size: .7rem; }
+.method-stat-win, .method-stat-loss { font-size: 1.18rem; font-variant-numeric: tabular-nums; font-weight: 750; }
+.method-stat-win { color: #a9eace; }
+.method-stat-loss { color: #ffc1c9; }
 .profile-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: .6rem; margin: 1.2rem 0 0; }
 .profile-stats div { padding: .7rem .85rem; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); }
 .profile-stats dt { color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
@@ -369,6 +383,7 @@ tbody tr:hover { background: var(--raised); }
     th, td { padding: .64rem .65rem; }
 }
 @media (max-width: 390px) {
+    .method-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .section-head { flex-wrap: wrap; }
     .header-brand { gap: .45rem; }
     .brand-name { display: none; }

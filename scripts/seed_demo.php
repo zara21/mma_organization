@@ -75,6 +75,38 @@ function fillDemoImage(string $table, string $column, string $slug, string $file
     return query("UPDATE $table SET $column = ? WHERE slug = ? AND ($column IS NULL OR $column = '')", [$file, $slug])->rowCount();
 }
 
+function seedMissingBoutMethods(): int
+{
+    $winningMethods = ['KO', 'Submission', 'Unanimous decision', 'TKO (referee stoppage)', 'Technical submission',
+        'Split decision', 'TKO (doctor stoppage)', 'Majority decision', 'TKO (corner stoppage)'];
+    $drawMethods = ['Unanimous draw', 'Split draw', 'Majority draw', 'Technical draw'];
+    $updated = 0;
+    foreach (['event_fights', 'fights'] as $table) {
+        $bouts = query("SELECT f.fight_id, f.result, f.event_id FROM $table f
+            JOIN events e ON e.event_id = f.event_id
+            JOIN fighters a ON a.fighter_id = f.fighter1_id
+            JOIN fighters b ON b.fighter_id = f.fighter2_id
+            WHERE e.slug REGEXP '^demo-(fight-night|league-fight-night)-[0-9]{2}$'
+              AND a.slug LIKE 'demo-%' AND b.slug LIKE 'demo-%'
+              AND (f.method IS NULL OR TRIM(f.method) = '')
+              AND f.result IN ('Win', 'Loss', 'Fighter 1 Wins', 'Fighter 2 Wins', 'Draw', 'No contest')")->fetchAll();
+        foreach ($bouts as $bout) {
+            $variant = (int) $bout['fight_id'] + 2 * (int) $bout['event_id'];
+            $method = match (resultLabel($bout['result'], true)) {
+                'Draw' => $drawMethods[$variant % count($drawMethods)],
+                'No contest' => 'Accidental foul',
+                default => $winningMethods[$variant % count($winningMethods)],
+            };
+            $updated += query("UPDATE $table SET method = ? WHERE fight_id = ? AND (method IS NULL OR TRIM(method) = '')",
+                [$method, $bout['fight_id']])->rowCount();
+        }
+    }
+    if ($updated) {
+        logAdminAction(null, 'Fight result', "Filled in simulated finish methods for $updated test bouts.");
+    }
+    return $updated;
+}
+
 function seedRankingSeason(array $portraits, array $banners, DateTimeImmutable $today, array &$created, array &$images): void
 {
     global $pdo;
@@ -275,6 +307,7 @@ try {
         ['Seven test divisions each have a champion and five ranked contenders.',
             'The rankings show the leading fighters in each weight class.',
             '%Seven test divisions each have a champion and five ranked contenders.%']);
+    $created['fight methods'] = seedMissingBoutMethods();
 
     $pdo->commit();
 } catch (Throwable $error) {

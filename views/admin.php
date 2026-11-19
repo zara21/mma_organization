@@ -225,6 +225,10 @@ pageStart('Admin panel', '', true);
                         if (input($_POST, 'operation') === 'save' && $type !== 'file') {
                             $value = input($_POST, $key, (string) $value);
                         }
+                        if ($section === 'fights' && $key === 'method') {
+                            fightMethodPicker((string) $value, input($_POST, 'operation') === 'save' ? input($_POST, 'method_other') : null);
+                            continue;
+                        }
                         ?>
                         <label class="<?= $type === 'textarea' ? 'wide' : '' ?>"><?= h($fieldLabel) ?>
                             <?php if ($type === 'select'): ?>
@@ -275,7 +279,7 @@ pageStart('Admin panel', '', true);
                                                 <option value="<?= h($result) ?>" <?= $resultValue === $result ? 'selected' : '' ?>><?= h($caption) ?></option>
                                             <?php endforeach; ?>
                                         </select></label>
-                                        <label>Method<input name="method" maxlength="50" value="<?= h($methodValue) ?>" placeholder="KO, submission, decision…"></label>
+                                        <?php fightMethodPicker((string) $methodValue, $editingResult ? input($_POST, 'method_other') : null); ?>
                                         <label>Finish round<input type="number" name="finish_round" min="1" max="99" value="<?= h($roundValue) ?>"></label>
                                         <label>Time into round<input name="finish_time" maxlength="5" value="<?= h($timeValue) ?>" placeholder="M:SS"></label>
                                     </div>

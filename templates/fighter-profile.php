@@ -23,6 +23,7 @@ $recordedBouts = query("SELECT e.slug, COALESCE(e.title, f.location, 'Recorded f
                        WHERE f.fighter1_id = ? OR f.fighter2_id = ?", [$id, $id])->fetchAll();
 $bouts = array_merge($eventBouts, $recordedBouts);
 usort($bouts, static fn ($a, $b) => strcmp((string) $b['event_date'], (string) $a['event_date']));
+$methodStats = fighterMethodStats($id, $bouts);
 $photo = media($fighter['photo'], '');
 $birth = !empty($fighter['birthdate']) && $fighter['birthdate'] !== '0000-00-00' ? new DateTimeImmutable($fighter['birthdate']) : null;
 $stats = [
@@ -50,6 +51,23 @@ pageStart($fighter['name'], 'Fighters');
             <dl class="profile-stats"><?php foreach ($stats as $name => $value): ?>
                 <?php if ($value !== null): ?><div><dt><?= h($name) ?></dt><dd><?= h($value) ?></dd></div><?php endif; ?>
             <?php endforeach; ?></dl>
+            <section class="method-stats" aria-labelledby="method-stats-heading">
+                <div class="method-stats-heading">
+                    <h2 id="method-stats-heading">Results by method</h2>
+                    <small class="muted">Recorded bouts only</small>
+                </div>
+                <dl class="method-stat-grid">
+                    <?php foreach ($methodStats as $method => $totals): ?>
+                        <div class="method-stat-card">
+                            <dt><?= h($method) ?></dt>
+                            <dd>
+                                <span><strong class="method-stat-win"><?= $totals['Win'] ?></strong><small>Wins</small></span>
+                                <span><strong class="method-stat-loss"><?= $totals['Loss'] ?></strong><small>Losses</small></span>
+                            </dd>
+                        </div>
+                    <?php endforeach; ?>
+                </dl>
+            </section>
         </div>
     </header>
     <section class="list-section">

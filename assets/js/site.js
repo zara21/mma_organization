@@ -35,6 +35,19 @@ document.querySelectorAll('[data-confirm]').forEach(form => {
     });
 });
 
+document.querySelectorAll('[data-fight-method-picker]').forEach(picker => {
+    const select = picker.querySelector('[data-fight-method]');
+    const custom = picker.querySelector('[data-other-method]');
+    const input = custom.querySelector('input');
+    const sync = () => {
+        const show = select.value === '__other__';
+        custom.hidden = !show;
+        input.disabled = !show;
+    };
+    select.addEventListener('change', sync);
+    sync();
+});
+
 const rankingEditor = document.querySelector('[data-ranking-editor]');
 const swapGuide = rankingEditor?.querySelector('[data-rank-swap-guide]');
 if (swapGuide) {

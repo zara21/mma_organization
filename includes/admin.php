@@ -2,6 +2,17 @@
 declare(strict_types=1);
 
 const MAX_FIGHTER_RANK = 100000;
+const CUSTOM_FIGHT_METHOD = '__other__';
+const FIGHT_METHOD_GROUPS = [
+    'Knockout and stoppage' => [
+        'KO', 'TKO', 'TKO (referee stoppage)', 'TKO (doctor stoppage)',
+        'TKO (corner stoppage)', 'TKO (did not answer the bell)', 'TKO (injury)',
+    ],
+    'Submission' => ['Submission', 'Tap out', 'Verbal submission', 'Technical submission'],
+    'Decision' => ['Decision', 'Unanimous decision', 'Split decision', 'Majority decision', 'Technical decision'],
+    'Draw' => ['Unanimous draw', 'Split draw', 'Majority draw', 'Technical draw'],
+    'Other official results' => ['Disqualification', 'Forfeit', 'Accidental foul', 'Overturned result'],
+];
 
 function field(string $label, string $type = 'text', bool $required = false, int|float|array|null $options = null): array
 {
@@ -17,9 +28,16 @@ function fightDetailFields(): array
     ];
 }
 
-function validatedFightDetails(array $data): array
+function validatedFightDetails(array $data, string $customMethod = ''): array
 {
     $time = $data['finish_time'];
+    $method = $data['method'];
+    if ($method === CUSTOM_FIGHT_METHOD) {
+        $method = trim($customMethod);
+        if ($method === '' || !mb_check_encoding($method, 'UTF-8') || mb_strlen($method) > 50) {
+            throw new DomainException('Enter a description of up to 50 characters for the other method.');
+        }
+    }
     if ($data['finish_round'] !== null && (int) $data['finish_round'] < 1) {
         throw new DomainException('Enter a finish round of at least 1.');
     }
@@ -27,7 +45,7 @@ function validatedFightDetails(array $data): array
         throw new DomainException('Enter the finish time as minutes and seconds, for example 2:35.');
     }
     return [
-        'method' => $data['method'],
+        'method' => $method,
         'finish_round' => $data['finish_round'] === null ? null : (int) $data['finish_round'],
         'finish_seconds' => $time === null ? null : (int) $parts[1] * 60 + (int) $parts[2],
     ];
@@ -319,7 +337,7 @@ function saveAdminRecord(string $section, string $pk, array $fields, int $id, ?i
             throw new DomainException('That weight class already exists.');
         }
         if ($section === 'fights') {
-            $data = array_replace($data, validatedFightDetails($data));
+            $data = array_replace($data, validatedFightDetails($data, input($_POST, 'method_other')));
             unset($data['finish_time']);
             if ((int) $data['fighter1_id'] === (int) $data['fighter2_id']) {
                 throw new DomainException('Choose two different fighters.');
@@ -473,7 +491,7 @@ function saveFightCard(int $eventId, string $operation, ?int $adminId = null): v
                 }
                 $details = $result === 'Pending'
                     ? ['method' => null, 'finish_round' => null, 'finish_seconds' => null]
-                    : validatedFightDetails(validatedFields(fightDetailFields()));
+                    : validatedFightDetails(validatedFields(fightDetailFields()), input($_POST, 'method_other'));
                 if ($result !== $previous) {
                     applyRecord($first, $second, $previous, -1);
                     applyRecord($first, $second, $result, 1);

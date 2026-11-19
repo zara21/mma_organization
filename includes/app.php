@@ -215,6 +215,37 @@ function resultLabel(?string $result, bool $first): string
     };
 }
 
+function boutMethodGroup(?string $method): string
+{
+    $method = trim((string) $method);
+    if ($method === '' || in_array(strtolower($method), ['unknown', 'unverified', 'not specified'], true)) {
+        return 'Method not recorded';
+    }
+    return match (true) {
+        (bool) preg_match('~\b(?:t\.?\s*k\.?\s*o|k\.?\s*o|knock[\s-]*out|(?:referee|doctor|medical|corner) stoppage|did not answer the bell)\b|ნოკაუტ~iu', $method) => 'KO',
+        (bool) preg_match('~\b(?:submissions?|sub|tap[\s-]*out|tapped|chokes?|arm[\s-]*bar|kimura|americana|omoplata|gogoplata|heel[\s-]*hook|knee[\s-]*bar|toe[\s-]*hold|ankle[\s-]*lock|wrist[\s-]*lock|arm[\s-]*lock|leg[\s-]*lock|neck[\s-]*crank|twister|triangle|guillotine|slicers?)\b|საბმიშ|დანებ~iu', $method) => 'Submission',
+        (bool) preg_match('~\b(?:decisions?|points?|score[\s-]*cards?|judges?|ud|sd|md)\b|ქულ|გადაწყვეტილებ~iu', $method) => 'Decision',
+        default => 'Other',
+    };
+}
+
+function fighterMethodStats(int $fighterId, array $bouts): array
+{
+    $stats = array_fill_keys(['KO', 'Submission', 'Decision', 'Other', 'Method not recorded'], ['Win' => 0, 'Loss' => 0]);
+    foreach ($bouts as $bout) {
+        $outcome = resultLabel($bout['result'], (int) $bout['fighter1_id'] === $fighterId);
+        if ($outcome === 'Win' || $outcome === 'Loss') {
+            $stats[boutMethodGroup($bout['method'] ?? null)][$outcome]++;
+        }
+    }
+    foreach (['Other', 'Method not recorded'] as $group) {
+        if (array_sum($stats[$group]) === 0) {
+            unset($stats[$group]);
+        }
+    }
+    return $stats;
+}
+
 function boutOutcome(?string $result, bool $first, string $state): string
 {
     $outcome = resultLabel($result, $first);

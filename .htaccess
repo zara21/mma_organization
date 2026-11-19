@@ -1,0 +1,16 @@
+Options -MultiViews
+
+<FilesMatch "(?i)\.sql$">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+
+RewriteCond %{THE_REQUEST} "\s/[^?\s]+\.php(?:[?\s])"
+RewriteRule ^index\.php$ /mma_organization/ [R=308,END]
+
+RewriteCond %{THE_REQUEST} "\s/[^?\s]+\.php(?:[?\s])"
+RewriteRule ^(views/(?:about|admin|events|fighters|news|profile|ranking|register)|routes/(?:login|logout))\.php$ /mma_organization/$1 [R=308,END]
+
+RewriteRule ^(views/(?:about|admin|events|fighters|news|profile|ranking|register)|routes/(?:login|logout))/?$ $1.php [END]
+RewriteRule ^views/(fighter|article|event)/([^/]+)/?$ views/$1.php?slug=$2 [B,END]

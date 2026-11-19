@@ -1,258 +1,84 @@
-<?php include __DIR__ . '/config/db_connect.php';
- 
-include  __DIR__ . '/includes/header.php'; ?>
+<?php
+require __DIR__ . '/includes/app.php';
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>MMA Organization</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+$events = query('SELECT * FROM events ORDER BY event_date DESC, event_id DESC')->fetchAll();
+$upcoming = array_values(array_reverse(array_filter($events, static fn ($event) => eventState($event) === 'Upcoming')));
+$live = array_values(array_filter($events, static fn ($event) => eventState($event) === 'Live'));
+$featured = $live[0] ?? $upcoming[0] ?? $events[0] ?? null;
+$schedule = array_slice(array_filter($upcoming, static fn ($event) => $event['event_id'] !== $featured['event_id']), 0, 3);
+$fighters = query('SELECT f.*, w.name AS class_name FROM fighters f LEFT JOIN weight_classes w USING (weight_class_id)
+                   ORDER BY f.ranking IS NULL, f.ranking, f.fighter_id DESC LIMIT 4')->fetchAll();
+$stories = query("SELECT * FROM news WHERE status = 'active' AND category <> 'Highlights' ORDER BY is_featured DESC, publish_date DESC, news_id DESC LIMIT 3")->fetchAll();
+$highlights = query("SELECT * FROM news WHERE status = 'active' AND category = 'Highlights' ORDER BY publish_date DESC, news_id DESC LIMIT 3")->fetchAll();
+$state = $featured ? eventState($featured) : '';
+$banner = $featured ? media($featured['banner'], 'banners') : null;
+$ticket = $state === 'Upcoming' ? httpLink($featured['ticket_link']) : null;
+$title = $featured ? ($featured['e_name'] ?: $featured['title']) : 'MMA Organization';
+$featureTitle = explode(' | ', $title, 2);
+$headline = preg_split('/\s+vs\.?\s+/i', $featureTitle[1] ?? $title, 2);
 
-    <style>
-        .ticket-button {
-            position: absolute;
-            bottom: 20px; /* ბანერის ქვედა კიდიდან 20px */
-            left: 20px;   /* ბანერის მარცხენა კიდიდან 20px */
-            text-decoration: none;
-            background: #D20A0A;
-            border: 1px solid #D20A0A;
-            border-radius: 6px;
-            box-shadow: rgba(0, 0, 0, 0.1) 1px 2px 4px;
-            box-sizing: border-box;
-            color: #FFFFFF;
-            cursor: pointer;
-            display: inline-block;
-            font-family: nunito,roboto,proxima-nova,"proxima nova",sans-serif;
-            font-size: 16px;
-            font-weight: 800;
-            line-height: 16px;
-            min-height: 40px;
-            outline: 0;
-            padding: 20px 40px;
-            text-align: center;
-            text-rendering: geometricprecision;
-            text-transform: none;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
-            vertical-align: middle;
-        }
-
-        .ticket-button:hover{
-            background-color: #FFFFFF;
-            color: #D20A0A;
-        }
-        .ticket-button:active {
-            background-color: #d04028;
-        }
-
-        .ticket-button:active {
-        opacity: .5;
-        }
-
-
-    </style>
-
-
-</head>
-<body>
-    <!-- Hero Section -->
-    <section class="hero">
-        <!-- Main Event Banner Section -->
-        <?php
-            // Fetch the nearest upcoming event
-            $stmt = $conn->prepare("
-                SELECT e.event_id, e.title,  e.e_name, e.event_date, e.banner, e.ticket_link,
-                    REPLACE(REPLACE(REPLACE(LOWER(e.title), ' ', '-'), '\"', ''), '''', '') AS slug
-                FROM events e
-                WHERE e.event_date > NOW()
-                ORDER BY e.event_date ASC
-                LIMIT 1
-            ");
-            $stmt->execute();
-            $event = $stmt->get_result()->fetch_assoc();
-            $stmt->close();
-
-            $bannerPath = !empty($event['banner']) && file_exists("assets/uploads/banners/{$event['banner']}")
-                ? "assets/uploads/banners/{$event['banner']}"
-                : 'images/default-banner.jpg';
-
-            $eventName = htmlspecialchars($event['e_name']); // Title for display
-
-            $eventTitle = htmlspecialchars($event['title']); // Title for display
-            $eventDate = htmlspecialchars($event['event_date']); // Date for display
-            $eventSlug = $event['slug']; // Raw slug for URL
-            $ticketLink = !empty($event['ticket_link']) ? htmlspecialchars($event['ticket_link']) : "#"; // Default link if empty
-            ?>
-
-        <div class="main-banner">
-            <a href="/mma_organization/events/<?= $eventSlug ?>.php">
-                <img src="<?= $bannerPath ?>" alt="<?= $eventTitle ?> Banner" class="banner-img">
-            </a>
-            <div class="banner-content">
-                <p class="banner-title"><?= $eventName ?></p>
-                <p class="event-time"><?= $eventDate ?></p>
-                <div id="countdown" class="countdown-timer">
-                    <div class="time">
-                        <span class="time-num" id="days"></span>
-                        <span class="time-label">Days</span>
-                    </div>
-                    <div class="time">
-                        <span class="time-num" id="hours"></span>
-                        <span class="time-label">Hours</span>
-                    </div>
-                    <div class="time">
-                        <span class="time-num" id="minutes"></span>
-                        <span class="time-label">Minutes</span>
-                    </div>
-                    <div class="time">
-                        <span class="time-num" id="seconds"></span>
-                        <span class="time-label">Seconds</span>
-                    </div>
+pageStart('Home', 'Home');
+?>
+<main class="home">
+    <section class="hero<?= $banner ? ' has-art' : '' ?>">
+        <div class="hero-inner">
+            <?php if ($featured): ?>
+                <div class="hero-kicker">
+                    <span class="hero-status<?= $state === 'Live' ? ' is-live' : '' ?>"><?= h(match ($state) { 'Upcoming' => 'Next event', 'Live' => 'Live event', default => 'From the archive' }) ?></span>
+                    <?php if (isset($featureTitle[1])): ?><p><?= h($featureTitle[0]) ?></p><?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <h1><?= h($headline[0]) ?><?php if (isset($headline[1])): ?> <span><small>vs</small> <?= h($headline[1]) ?></span><?php endif; ?></h1>
+            <p class="hero-meta"><?= h($featured ? dateLabel($featured['event_date'], 'l, F j, Y · H:i') : 'Fight cards, rankings and the latest from the world of MMA.') ?><?php if ($featured && $featured['event_date']): ?> <span><?= h(dateLabel($featured['event_date'], 'T')) ?></span><?php endif; ?></p>
+            <?php if ($featured && $state === 'Upcoming' && $featured['event_date']): ?>
+                <div class="countdown" data-countdown="<?= strtotime($featured['event_date']) ?>" aria-label="Time until the event">
+                    <?php foreach (['Days', 'Hours', 'Min', 'Sec'] as $unit): ?><div><strong>00</strong><small><?= $unit ?></small></div><?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <div class="hero-actions">
+                <?php if ($featured): ?><a class="button button-primary" href="<?= detailUrl('event', $featured) ?>">View fight card</a><?php endif; ?>
+                <?php if ($ticket): ?><a class="button button-outline" href="<?= h($ticket) ?>">Tickets</a><?php endif; ?>
+                <a class="button <?= $featured ? 'button-outline' : 'button-primary' ?>" href="<?= url('/views/events') ?>">All events</a>
+            </div>
+        </div>
+        <?php if ($banner): ?><div class="hero-art"><img src="<?= h($banner) ?>" alt="" fetchpriority="high"></div><?php endif; ?>
+    </section>
+    <?php if ($schedule): ?>
+        <section class="home-section schedule">
+            <div class="shell">
+                <?php sectionTitle('On the calendar', '/views/events?status=Upcoming', 'Full schedule'); ?>
+                <div class="schedule-grid">
+                    <?php foreach ($schedule as $event): ?>
+                        <a class="schedule-item panel" href="<?= detailUrl('event', $event) ?>">
+                            <?php if ($event['event_date']): ?><time datetime="<?= h(dateLabel($event['event_date'], 'c')) ?>">
+                                <span><?= h(dateLabel($event['event_date'], 'M')) ?></span>
+                                <strong><?= h(dateLabel($event['event_date'], 'j')) ?></strong>
+                            </time><?php endif; ?>
+                            <div>
+                                <h3><?= h($event['title']) ?></h3>
+                                <p><?= h(dateLabel($event['event_date'], 'l · H:i T')) ?></p>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
                 </div>
             </div>
-            <a href="<?= $ticketLink ?>" class="ticket-button" target="_blank">TICKETS</a>
-        </div>
-
-
-        <script>
-            // Countdown Timer Logic
-            function updateCountdown() {
-                const eventDate = new Date("<?= htmlspecialchars($event['event_date']); ?>").getTime();
-                const now = new Date().getTime();
-                const distance = eventDate - now;
-
-                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-                document.getElementById("days").innerText = days;
-                document.getElementById("hours").innerText = hours;
-                document.getElementById("minutes").innerText = minutes;
-                document.getElementById("seconds").innerText = seconds;
-
-                if (distance < 0) {
-                    clearInterval(countdownInterval);
-                    document.getElementById("countdown").innerHTML = "Event Started";
-                }
-            }
-
-            const countdownInterval = setInterval(updateCountdown, 1000);
-            updateCountdown(); // Initial call to display countdown immediately
-        </script>
+        </section>
+    <?php endif; ?>
+    <section class="shell home-section">
+        <?php sectionTitle('Fighter roster', '/views/fighters', 'All fighters'); ?>
+        <div class="cards cards-four"><?php foreach ($fighters as $fighter) fighterCard($fighter); ?></div>
+        <?php if (!$fighters): ?><p class="empty">Fighters will appear here when added to the roster.</p><?php endif; ?>
     </section>
-
-
-    <!-- Fighters Section -->
-    <section class="fighters">
-        <h2>Meet the Fighters</h2>
-        <div class="fighters-grid">
-            <?php
-                // Get 4 random fighters
-                $stmt = $pdo->query("SELECT * FROM fighters ORDER BY RAND() LIMIT 4");
-                while ($fighter = $stmt->fetch()) {
-                    echo "<div class='fighter-card'>";
-                    $slug = strtolower(str_replace(' ', '-', $fighter['name']));
-
-                    if (!empty($fighter['photo'])) {
-                        echo "<div class='fighter-photo-container'>";
-                        echo "<a href='athletes/$slug.php'>";
-                        echo "<img src='assets"  . htmlspecialchars($fighter['photo']) . "' alt='" . htmlspecialchars($fighter['name']) . "' class='fighter-photo'>";
-                        echo "</a>";
-                        echo "</div>";
-                    }
-                    echo "<div class='fighter-card-info'>";
-                        echo "<h3><a href='athletes/$slug.php'>" . htmlspecialchars($fighter['name']) . "</a></h3>";
-                        echo "<p>" . htmlspecialchars($fighter['nickname']) . "</p>";
-                        echo "<p>Record: " . htmlspecialchars($fighter['wins']) . "-" . htmlspecialchars($fighter['losses']) . "-" . htmlspecialchars($fighter['draws']) . "</p>";
-                    echo "</div>";
-                    
-                    echo "</div>";
-                }
-            ?>
-        </div>
-        <a href="fighters.php" class="btn">View All Fighters</a>
+    <section class="shell home-section">
+        <?php sectionTitle('Latest news', '/views/news', 'All news'); ?>
+        <div class="cards"><?php foreach ($stories as $story) storyCard($story); ?></div>
+        <?php if (!$stories): ?><p class="empty">No articles have been published yet.</p><?php endif; ?>
     </section>
-    <!-- Latest News Section -->
-    <section class="news">
-        <h2>Latest News</h2>
-        <div class="row">
-            <?php
-                // Fetch 4 latest active news
-                $stmt = $pdo->query("SELECT * FROM news WHERE status = 'active' AND category = 'News' ORDER BY publish_date DESC LIMIT 4");
-                while ($news = $stmt->fetch()) {
-                    echo "<div class='col-md-3'>"; // Bootstrap column
-                    echo "<div class='news-card'>";
-
-                    $slug = htmlspecialchars($news['slug']);
-
-                    if (!empty($news['image_url'])) {
-                        echo "<div class='news-photo-container position-relative'>";
-                        echo "<a href='news/$slug.php'>";
-                        echo "<img src='assets/uploads/news_images/" . htmlspecialchars($news['image_url']) . "' alt='" . htmlspecialchars($news['title']) . "' class='img-fluid rounded'>";
-                        echo "</a>";
-                        echo "</div>";
-                    }
-
-                    echo "<div class='news-card-info mt-3'>";
-                    echo "<h3 class='h5'><a href='/mma_organization/news/$slug.php'>" . htmlspecialchars($news['title']) . "</a></h3>";
-                    echo "<p>" . htmlspecialchars(substr($news['content'], 0, 100)) . "...</p>";
-                    echo "</div>";
-
-                    echo "</div>";
-                    echo "</div>";
-                }
-            ?>
-        </div>
-        <a href="news.php" class="btn">View All News</a>
-    </section>
-
-    <!-- Video Highlights Section -->
-    <section class="highlights mt-5">
-        <h2>VIDEOS</h2>
-        <div class="row">
-            <?php
-                // Fetch 4 latest highlights
-                $stmt = $pdo->query("SELECT * FROM news WHERE status = 'active' AND category = 'Highlights' ORDER BY publish_date DESC LIMIT 4");
-                while ($highlight = $stmt->fetch()) {
-                    echo "<div class='col-md-3'>"; // Bootstrap column
-                    echo "<div class='highlight-card'>";
-
-                    $slug = htmlspecialchars($highlight['slug']);
-
-                    if (!empty($highlight['image_url'])) {
-                        echo "<div class='highlight-photo-container position-relative'>";
-                        echo "<a href='news/$slug.php'>";
-                        echo "<img src='assets/uploads/news_images/" . htmlspecialchars($highlight['image_url']) . "' alt='" . htmlspecialchars($highlight['title']) . "' class='img-fluid rounded'>";
-                        echo "<img src='assets/uploads/icon/video.svg' alt='Video Icon' class='video-icon'>";
-
-                        echo "<div class='video-icon position-absolute top-50 start-50 translate-middle'>";
-
-                        echo "<i class='bi bi-play-circle-fill text-white'></i>"; // Video icon
-                        echo "</div>";
-                        echo "</a>";
-                        echo "</div>";
-                    }
-
-                    echo "<div class='highlight-card-info '>";
-
-                    echo "<h3 class='h5'><a href='news/$slug.php'>" . htmlspecialchars($highlight['title']) . "</a></h3>";
-                    echo "<p>" . htmlspecialchars(substr($highlight['content'], 0,50)) . "...</p>";
-                    echo "</div>";
-
-                    echo "</div>";
-                    echo "</div>";
-                }
-            ?>
-        </div>
-        <a href="highlights.php" class="btn">Watch All Video</a>
-    </section>
-
-
-
-</body>
-<?php include 'includes/footer.php'; ?>
-</html>
+    <?php if ($highlights): ?>
+        <section class="shell home-section">
+            <?php sectionTitle('Highlights', '/views/news?category=Highlights', 'All highlights'); ?>
+            <div class="cards"><?php foreach ($highlights as $story) storyCard($story); ?></div>
+        </section>
+    <?php endif; ?>
+</main>
+<?php pageEnd(); ?>

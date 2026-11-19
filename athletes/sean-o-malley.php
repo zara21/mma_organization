@@ -1,3 +1,3 @@
 <?php
 $fighter_slug = 'sean-o-malley';
-include '../templates/fighter-profile.php';
+require __DIR__ . '/../templates/fighter-profile.php';

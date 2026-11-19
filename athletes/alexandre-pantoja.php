@@ -1,3 +1,3 @@
 <?php
 $fighter_slug = 'alexandre-pantoja';
-include '../templates/fighter-profile.php';
+require __DIR__ . '/../templates/fighter-profile.php';

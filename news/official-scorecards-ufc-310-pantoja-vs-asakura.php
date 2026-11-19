@@ -1,3 +1,3 @@
 <?php
 $nslug = 'official-scorecards-ufc-310-pantoja-vs-asakura';
-include '../templates/news_template.php';
+require __DIR__ . '/../templates/news_template.php';

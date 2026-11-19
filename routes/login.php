@@ -1,57 +1,72 @@
 <?php
-// ჩართეთ ბაზის კავშირის ფაილი და დაიწყეთ სესია
-include __DIR__ . '/../config/db_connect.php';
-session_start();
+require __DIR__ . '/../includes/app.php';
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
-
-    // მომხმარებლის მონაცემების მიღება ბაზიდან
-    $stmt = $pdo->prepare("SELECT user_id, username, password, is_admin FROM users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-
-    // მომხმარებლის არსებობისა და პაროლის გადამოწმება
-    if ($user && password_verify($password, $user['password'])) {
-        // სესიის ცვლადებში მომხმარებლის მონაცემების შენახვა
-        $_SESSION['user_id'] = $user['user_id'];
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['is_admin'] = $user['is_admin'];
-        
-        // მომხმარებლის გადამისამართება მთავარ გვერდზე
-        header("Location: index.php");
-        exit;
+$register = $register ?? false;
+$error = '';
+$email = '';
+$username = '';
+$next = input($_GET, 'next') === 'admin';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyPost();
+    $email = input($_POST, 'email');
+    $username = input($_POST, 'username');
+    $password = $_POST['password'] ?? '';
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 100 || !is_string($password) || $password === '' || strlen($password) > 72 || str_contains($password, "\0")) {
+        $error = 'Enter a valid email and password.';
+    } elseif ($register) {
+        if ($username === '' || mb_strlen($username) > 50 || strlen($password) < 8) {
+            $error = 'Enter a username up to 50 characters and a password of 8–72 bytes.';
+        } else {
+            $locked = (int) query("SELECT GET_LOCK('mma_organization_register', 5)")->fetchColumn() === 1;
+            if (!$locked) {
+                $error = 'Registration is busy. Try again shortly.';
+            } else {
+                try {
+                    if (query('SELECT user_id FROM users WHERE email = ?', [$email])->fetch()) {
+                        $error = 'That email address already has an account.';
+                    } else {
+                        query('INSERT INTO users (username, email, password) VALUES (?, ?, ?)', [$username, $email, password_hash($password, PASSWORD_DEFAULT)]);
+                        $_SESSION['notice'] = 'Account created. Sign in to continue.';
+                    }
+                } catch (PDOException $exception) {
+                    error_log($exception->getMessage());
+                    $error = 'Your account could not be created. Check the details and try again.';
+                } finally {
+                    query("SELECT RELEASE_LOCK('mma_organization_register')");
+                }
+                if (!$error) {
+                    redirect('/routes/login');
+                }
+            }
+        }
     } else {
-        // შეცდომის შეტყობინება არასწორი მონაცემების შემთხვევაში
-        $error = "Incorrect email or password";
+        $account = query('SELECT user_id, password, is_admin, role FROM users WHERE email = ? LIMIT 1', [$email])->fetch();
+        if ($account && password_verify($password, $account['password'])) {
+            session_regenerate_id(true);
+            $_SESSION = ['user_id' => $account['user_id']];
+            redirect($next && isAdmin($account) ? '/views/admin' : '/');
+        }
+        $error = 'Email or password is incorrect.';
     }
 }
+$notice = $_SESSION['notice'] ?? '';
+unset($_SESSION['notice']);
+$title = $register ? 'Create an account' : 'Sign in';
+pageStart($title, $register ? 'Register' : 'Account');
 ?>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Login</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
-</head>
-<body>
-    <?php __DIR__ . '/../includes/navbar.php'; ?>
-    <h1>Login</h1>
-    
-    <?php
-    // შეცდომის გამოტანა, თუ მონაცემები არასწორია
-    if (isset($error)) {
-        echo "<p style='color: red;'>$error</p>";
-    }
-    ?>
-
-    <form method="POST" action="login.php">
-        <input type="email" name="email" placeholder="Email" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Login</button>
-    </form>
-</body>
-<?php include '../includes/footer.php'; ?>
-</html>
+<main class="shell section auth-shell">
+    <div class="panel auth-panel">
+        <h1><?= h($title) ?></h1>
+        <?php if ($error): ?><p class="alert error" role="alert"><?= h($error) ?></p><?php endif; ?>
+        <?php if ($notice): ?><p class="alert" role="status"><?= h($notice) ?></p><?php endif; ?>
+        <form method="post" class="stack">
+            <?php csrfField(); ?>
+            <?php if ($register): ?><label>Username<input name="username" value="<?= h($username) ?>" maxlength="50" autocomplete="username" required></label><?php endif; ?>
+            <label>Email<input type="email" name="email" value="<?= h($email) ?>" maxlength="100" autocomplete="email" required></label>
+            <label>Password<input type="password" name="password" autocomplete="<?= $register ? 'new-password' : 'current-password' ?>" <?= $register ? 'minlength="8" maxlength="72"' : '' ?> required></label>
+            <button class="button button-primary"><?= h($title) ?></button>
+        </form>
+        <p><a class="text-link" href="<?= url($register ? '/routes/login' : '/views/register') ?>"><?= $register ? 'Already have an account? Sign in' : 'Create an account' ?></a></p>
+    </div>
+</main>
+<?php pageEnd(); ?>

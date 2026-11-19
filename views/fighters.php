@@ -1,60 +1,34 @@
 <?php
-include __DIR__ . '/../config/db_connect.php';
+require __DIR__ . '/../includes/app.php';
 
-$searchTerm = '';
-
-// Check if a search query was submitted
-if (isset($_GET['search'])) {
-    $searchTerm = $_GET['search'];
-    $query = "SELECT *, TIMESTAMPDIFF(YEAR, birthdate, CURDATE()) AS age FROM fighters WHERE name LIKE ? OR nickname LIKE ?";
-    $stmt = $conn->prepare($query);
-    $searchWildcard = '%' . $searchTerm . '%';
-    $stmt->bind_param("ss", $searchWildcard, $searchWildcard);
-    $stmt->execute();
-    $result = $stmt->get_result();
-} else {
-    $query = "SELECT *, TIMESTAMPDIFF(YEAR, birthdate, CURDATE()) AS age FROM fighters";
-    $result = $conn->query($query);
-}
+$search = input($_GET, 'search');
+$division = (int) input($_GET, 'division');
+$classes = query('SELECT * FROM weight_classes ORDER BY weight_class_id')->fetchAll();
+$pattern = '%' . $search . '%';
+$args = [$division, $division, $pattern, $pattern];
+$filter = " WHERE (? = 0 OR f.weight_class_id = ?) AND (f.name LIKE ? OR COALESCE(f.nickname, '') LIKE ?)";
+$count = (int) query('SELECT COUNT(*) FROM fighters f' . $filter, $args)->fetchColumn();
+$pageSize = 16;
+$pageCount = max(1, (int) ceil($count / $pageSize));
+$page = max(1, min($pageCount, (int) input($_GET, 'page', '1')));
+$offset = ($page - 1) * $pageSize;
+$fighters = query('SELECT f.*, w.name AS class_name FROM fighters f LEFT JOIN weight_classes w USING (weight_class_id)' . $filter .
+                  " ORDER BY f.ranking IS NULL, f.ranking, f.name, f.fighter_id LIMIT $pageSize OFFSET $offset", $args)->fetchAll();
+pageStart('Fighters', 'Fighters');
 ?>
-
-<?php include '../includes/header.php'; ?>
-
-<link rel="stylesheet" href="../css/fighters.css">
-
-<h1 class="page-title">MMA Fighters</h1>
-
-<!-- Search Form -->
-<form method="GET" action="fighters.php" class="search-form">
-    <div class="search"> <input type="text" name="search" placeholder="Search fighters by name or nickname" value="<?= htmlspecialchars($searchTerm) ?>"></div>
-    <div class="button"> <button type="submit">Search</button></div>
-    
-</form>
-
-<!-- Fighters Container -->
-<div class="fighters-container">
-    <?php if ($result->num_rows > 0): ?>
-        <?php while ($fighter = $result->fetch_assoc()): ?>
-            <div class="fighter-card">
-                <div class="fighter-photo">
-                    <img src="../assets/<?= !empty($fighter['photo']) ? htmlspecialchars($fighter['photo']) : '../images/default.jpg' ?>" alt="<?= htmlspecialchars($fighter['name']) ?>">
-                </div>
-                <div class="fighter-info">
-                    <h2>
-                        <a href="../athletes/<?= htmlspecialchars($fighter['slug']) ?>.php"><?= htmlspecialchars($fighter['name']) ?></a>
-                    </h2>
-                    <p><strong>Nickname:</strong> <?= htmlspecialchars($fighter['nickname']) ?></p>
-                    <p><strong>Age:</strong> <?= htmlspecialchars($fighter['age']) ?> years</p>
-                    <p><strong>Weight:</strong> <?= htmlspecialchars($fighter['weight']) ?> kg</p>
-                    <p><strong>Wins:</strong> <?= htmlspecialchars($fighter['wins']) ?></p>
-                    <p><strong>Losses:</strong> <?= htmlspecialchars($fighter['losses']) ?></p>
-                    <a class="view-profile" href="../athletes/<?= htmlspecialchars($fighter['slug']) ?>.php">View Profile</a>
-                </div>
-            </div>
-        <?php endwhile; ?>
-    <?php else: ?>
-        <p class="no-results">No fighters found for "<?= htmlspecialchars($searchTerm) ?>".</p>
-    <?php endif; ?>
-</div>
-
-<?php include '../includes/footer.php'; ?>
+<main class="shell section">
+    <?php pageHeading('Fighter roster', 'Find athletes by name, nickname or weight class.'); ?>
+    <form class="filters filter-form" method="get">
+        <label>Search fighters<input type="search" name="search" value="<?= h($search) ?>" placeholder="Name or nickname"></label>
+        <label>Weight class<select name="division"><option value="0">All weight classes</option>
+            <?php foreach ($classes as $class): ?><option value="<?= (int) $class['weight_class_id'] ?>" <?= $division === (int) $class['weight_class_id'] ? 'selected' : '' ?>><?= h($class['name']) ?></option><?php endforeach; ?>
+        </select></label>
+        <button class="button button-primary">Search</button>
+        <?php if ($search !== '' || $division): ?><a class="button button-outline" href="<?= url('/views/fighters') ?>">Clear</a><?php endif; ?>
+    </form>
+    <?php if ($count): ?><p class="results-count"><?= $count ?> <?= $count === 1 ? 'fighter' : 'fighters' ?></p><?php endif; ?>
+    <div class="cards cards-four"><?php foreach ($fighters as $fighter) fighterCard($fighter); ?></div>
+    <?php if (!$fighters): ?><p class="empty">No fighters match these filters.</p><?php endif; ?>
+    <?php pagination($page, $pageCount, ['search' => $search, 'division' => $division], 'Fighter pages'); ?>
+</main>
+<?php pageEnd(); ?>

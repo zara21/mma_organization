@@ -1,29 +1,16 @@
-<?php include '../includes/db_connect.php'; ?>
-<?php include '../includes/navbar.php'; ?>
+<?php
+require __DIR__ . '/../includes/app.php';
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Profile</title>
-    <link rel="stylesheet" href="../css/styles.css">
-</head>
-<body>
-    <h1>Your Profile</h1>
-    <?php
-        if (isset($_SESSION['user_id'])) {
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ?");
-            $stmt->execute([$_SESSION['user_id']]);
-            $user = $stmt->fetch();
-
-            echo "<p>Username: " . htmlspecialchars($user['username']) . "</p>";
-            echo "<p>Email: " . htmlspecialchars($user['email']) . "</p>";
-        } else {
-            echo "You are not logged in.";
-        }
-    ?>
-</body>
-<?php include '../includes/footer.php'; ?>
-</html>
-
-
+$user = currentUser();
+if (!$user) {
+    redirect('/routes/login');
+}
+pageStart('My account');
+?>
+<main class="shell section">
+    <?php pageHeading('My account', 'View your account details.'); ?>
+    <div class="panel prose"><h2><?= h($user['username']) ?></h2><p><?= h($user['email']) ?></p>
+        <?php if (isAdmin($user)): ?><a class="button button-primary" href="<?= url('/views/admin') ?>">Open admin panel</a><?php endif; ?>
+    </div>
+</main>
+<?php pageEnd(); ?>

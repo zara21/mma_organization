@@ -1,207 +1,75 @@
 <?php
-include __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../includes/app.php';
 
-if (!isset($fighter_slug)) {
-    die("Fighter profile not specified.");
-}
-
-// Retrieve fighter data using slug
-$query = "SELECT * FROM fighters WHERE slug = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("s", $fighter_slug);
-$stmt->execute();
-$fighter = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
+$slug = $fighter_slug ?? input($_GET, 'slug');
+$fighter = query('SELECT f.*, w.name AS class_name FROM fighters f LEFT JOIN weight_classes w USING (weight_class_id)
+                  WHERE f.slug IN (?, ?) ORDER BY (f.slug = ?) DESC, f.fighter_id LIMIT 1',
+    [$slug, 'demo-' . $slug, $slug])->fetch();
 if (!$fighter) {
-    die("Fighter not found.");
+    showError(404, 'Fighter not found.');
 }
+canonicalizeDetailUrl('fighter', $fighter);
+$id = (int) $fighter['fighter_id'];
+$eventBouts = query('SELECT e.slug, e.title, e.status, e.event_date, ef.result, ef.fighter1_id,
+                            a.slug AS first_slug, a.name AS first_name, b.slug AS second_slug, b.name AS second_name
+                     FROM event_fights ef JOIN events e USING (event_id)
+                     JOIN fighters a ON a.fighter_id = ef.fighter1_id JOIN fighters b ON b.fighter_id = ef.fighter2_id
+                     WHERE ef.fighter1_id = ? OR ef.fighter2_id = ?', [$id, $id])->fetchAll();
+$recordedBouts = query("SELECT e.slug, COALESCE(e.title, f.location, 'Recorded fight') AS title, 'Past' AS status,
+                              f.date AS event_date, f.result, f.fighter1_id, a.slug AS first_slug, a.name AS first_name,
+                              b.slug AS second_slug, b.name AS second_name
+                       FROM fights f LEFT JOIN events e USING (event_id)
+                       JOIN fighters a ON a.fighter_id = f.fighter1_id JOIN fighters b ON b.fighter_id = f.fighter2_id
+                       WHERE f.fighter1_id = ? OR f.fighter2_id = ?", [$id, $id])->fetchAll();
+$bouts = array_merge($eventBouts, $recordedBouts);
+usort($bouts, static fn ($a, $b) => strcmp((string) $b['event_date'], (string) $a['event_date']));
+$photo = media($fighter['photo'], '');
+$birth = !empty($fighter['birthdate']) && $fighter['birthdate'] !== '0000-00-00' ? new DateTimeImmutable($fighter['birthdate']) : null;
+$stats = [
+    'Age' => $birth ? $birth->diff(new DateTimeImmutable('today'))->y : null,
+    'Weight' => $fighter['weight'] ? $fighter['weight'] . ' kg' : null,
+    'Height' => $fighter['height'] && (float) $fighter['height'] < 3 ? $fighter['height'] . ' m' : null,
+    'Division' => isset($fighter['class_name']) ? $fighter['class_name'] . (is_numeric($fighter['class_name']) ? ' kg' : '') : null,
+];
 
-// Calculate age from birthdate
-if (!empty($fighter['birthdate'])) {
-    $birthdate = new DateTime($fighter['birthdate']);
-    $today = new DateTime();
-    $age = $today->diff($birthdate)->y;
-} else {
-    $age = "Unknown";
-}
-
-// Fetch upcoming fights
-$query_upcoming = "
-    SELECT 
-        ef.event_id, 
-        e.title AS event_title, 
-        e.event_date, 
-        f1.name AS fighter1, 
-        f2.name AS fighter2
-    FROM event_fights ef
-    JOIN events e ON ef.event_id = e.event_id
-    JOIN fighters f1 ON ef.fighter1_id = f1.fighter_id
-    JOIN fighters f2 ON ef.fighter2_id = f2.fighter_id
-    WHERE (ef.fighter1_id = ? OR ef.fighter2_id = ?) AND e.status = 'Upcoming'
-    ORDER BY e.event_date ASC";
-$stmt = $conn->prepare($query_upcoming);
-$stmt->bind_param("ii", $fighter['fighter_id'], $fighter['fighter_id']);
-$stmt->execute();
-$upcoming_fights = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-// Fetch fight history
-$query_history = "
-    SELECT 
-        ef.event_id, 
-        e.title AS event_title, 
-        e.event_date AS fight_date, 
-        ef.result, 
-        f1.name AS fighter1, 
-        f2.name AS fighter2, 
-        f1.fighter_id AS fighter1_id, 
-        f2.fighter_id AS fighter2_id
-    FROM event_fights ef
-    JOIN events e ON ef.event_id = e.event_id
-    JOIN fighters f1 ON ef.fighter1_id = f1.fighter_id
-    JOIN fighters f2 ON ef.fighter2_id = f2.fighter_id
-    WHERE (ef.fighter1_id = ? OR ef.fighter2_id = ?) AND e.status = 'Past'
-    ORDER BY e.event_date DESC";
-$stmt = $conn->prepare($query_history);
-$stmt->bind_param("ii", $fighter['fighter_id'], $fighter['fighter_id']);
-$stmt->execute();
-$fight_history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+pageStart($fighter['name'], 'Fighters');
 ?>
-
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title><?= htmlspecialchars($fighter['name']) ?> - MMA Organization</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
-</head>
-<body>
-<?php include '../includes/header.php'; ?>
-
-
-<section class="fighter-profile-card">
-    <div class="fighter-profile">
-
-    
-        <div class="fighter-card-container">
-            <!-- Fighter Photo -->
-            <?php if (!empty($fighter['photo'])): ?>
-                <div class="fighter-photo">
-                    <img src="../assets/<?= htmlspecialchars($fighter['photo']) ?>" alt="<?= htmlspecialchars($fighter['name']) ?>'s Photo">
-                </div>
-            <?php else: ?>
-                <div class="fighter-photo">
-                    <img src="../images/default-profile.jpg" alt="Default Photo">
-                </div>
-            <?php endif; ?>
-
-            <!-- Fighter Details -->
-            <div class="fighter-info">
-                <h1><?= htmlspecialchars($fighter['name']) ?></h1>
-                <ul class="fighter-stats">
-                    <li><strong>Age:</strong> <?= htmlspecialchars($age) ?> years</li>
-                    <li><strong>Weight:</strong> <?= htmlspecialchars($fighter['weight']) ?> kg</li>
-                    <li><strong>Height:</strong> <?= htmlspecialchars($fighter['height']) ?> cm</li>
-                    <li><strong>Records: (W-L-D)</strong> <?= htmlspecialchars($fighter['wins']) ?>:<?= htmlspecialchars($fighter['losses']) ?>:<?= htmlspecialchars($fighter['draws']) ?></li>
-                    
-                </ul>
-            </div>
+<main class="shell section">
+    <a class="back-link" href="<?= url('/views/fighters') ?>">All fighters</a>
+    <header class="panel profile-hero">
+        <div class="fighter-art">
+            <?php if ($photo): ?><img src="<?= h($photo) ?>" alt="">
+            <?php else: ?><span class="fighter-initials" aria-hidden="true"><?= h(fighterInitials($fighter['name'])) ?></span><?php endif; ?>
         </div>
-    </div>
-
-</section>
-
-<?php if (count($upcoming_fights) > 0): ?>
-    <h3>Upcoming Fights</h3>
-    <div class="upcoming-fights-container">
-        <table class="fight-history-table">
-            <thead>
-                <tr>
-                    <th>Event</th>
-                    <th>Opponent</th>
-                    <th>Date</th>
-                </tr>
-            </thead>
+        <div class="detail-copy">
+            <?php if ($photo && str_starts_with($fighter['slug'], 'demo-')): ?><p class="eyebrow">Illustrative photo</p>
+            <?php elseif ($fighter['nationality']): ?><p class="eyebrow"><?= h($fighter['nationality']) ?></p><?php endif; ?>
+            <h1><?= h($fighter['name']) ?></h1>
+            <?php if ($fighter['nickname']): ?><p>“<?= h($fighter['nickname']) ?>”</p><?php endif; ?>
+            <div class="record profile-record"><?= h(record($fighter)) ?> <small>W–L–D</small></div>
+            <dl class="profile-stats"><?php foreach ($stats as $name => $value): ?>
+                <?php if ($value !== null): ?><div><dt><?= h($name) ?></dt><dd><?= h($value) ?></dd></div><?php endif; ?>
+            <?php endforeach; ?></dl>
+        </div>
+    </header>
+    <section class="list-section">
+        <h2>Fight history &amp; schedule</h2>
+        <?php if (!$bouts): ?><p class="empty">No fights are listed for this athlete yet.</p><?php else: ?>
+        <div class="panel table-wrap"><table>
+            <thead><tr><th>Event</th><th>Opponent</th><th>Date</th><th>Result</th></tr></thead>
             <tbody>
-                <?php foreach ($upcoming_fights as $fight): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($fight['event_title']) ?></td>
-                        <td>
-                            <?php 
-                            $opponent = ($fight['fighter1'] === $fighter['name']) ? $fight['fighter2'] : $fight['fighter1'];
-                            $opponent_slug = strtolower(str_replace(' ', '-', $opponent));
-                            ?>
-                            <a href="../athletes/<?= $opponent_slug ?>.php" style="color: inherit; text-decoration: none;">
-                                <?= htmlspecialchars($opponent) ?>
-                            </a>
-                        </td>
-                        <td><?= htmlspecialchars(date('Y-m-d H:i', strtotime($fight['event_date']))) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-<?php endif; ?>
-
-<h3>Fight History</h3>
-<div class="fight-history-container">
-    <table class="fight-history-table">
-        <thead>
-            <tr>
-                <th>Fighter 1</th>
-                <th>Fighter 2</th>
-                <th>Result</th>
-                <th>Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (count($fight_history) > 0): ?>
-                <?php foreach ($fight_history as $fight): ?>
-                    <tr>
-                        <td style="font-weight: <?= $fight['fighter1_id'] == $fighter['fighter_id'] ? 'bold' : 'normal' ?>;">
-                            <?php
-                            $fighter1_slug = strtolower(str_replace(' ', '-', $fight['fighter1']));
-                            ?>
-                            <a href="../athletes/<?= $fighter1_slug ?>.php" style="color: inherit; text-decoration: none;">
-                                <?= htmlspecialchars($fight['fighter1']) ?>
-                            </a>
-                        </td>
-                        <td style="font-weight: <?= $fight['fighter2_id'] == $fighter['fighter_id'] ? 'bold' : 'normal' ?>;">
-                            <?php
-                            $fighter2_slug = strtolower(str_replace(' ', '-', $fight['fighter2']));
-                            ?>
-                            <a href="../athletes/<?= $fighter2_slug ?>.php" style="color: inherit; text-decoration: none;">
-                                <?= htmlspecialchars($fight['fighter2']) ?>
-                            </a>
-                        </td>
-                        <td>
-                            <?php
-                            if ($fight['result'] === 'Draw') {
-                                echo 'Draw';
-                            } elseif ($fight['fighter1_id'] == $fighter['fighter_id'] && $fight['result'] === 'Fighter 1 Wins') {
-                                echo '<span style="color: green; font-weight: bold;">Win</span>';
-                            } elseif ($fight['fighter2_id'] == $fighter['fighter_id'] && $fight['result'] === 'Fighter 2 Wins') {
-                                echo '<span style="color: green; font-weight: bold;">Win</span>';
-                            } else {
-                                echo '<span style="color: red; font-weight: bold;">Lost</span>';
-                            }
-                            ?>
-                        </td>
-                        <td><?= htmlspecialchars(date('Y-m-d H:i', strtotime($fight['fight_date']))) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
+            <?php foreach ($bouts as $bout): ?>
+                <?php $first = (int) $bout['fighter1_id'] === $id; $opponent = $first ? 'second' : 'first'; ?>
                 <tr>
-                    <td colspan="4">No fight history available for this fighter.</td>
+                    <td><?php if ($bout['slug']): ?><a href="<?= detailUrl('event', $bout) ?>"><?= h($bout['title']) ?></a><?php else: ?><?= h($bout['title']) ?><?php endif; ?></td>
+                    <td><a href="<?= detailUrl('fighter', ['slug' => $bout[$opponent . '_slug']]) ?>"><?= h($bout[$opponent . '_name']) ?></a></td>
+                    <td><?= h(dateLabel($bout['event_date'])) ?></td>
+                    <td><?php outcomeBadge(boutOutcome($bout['result'], $first, eventState($bout))); ?></td>
                 </tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
-</div>
-
-<?php include '../includes/footer.php'; ?>
-</body>
-</html>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div>
+        <?php endif; ?>
+    </section>
+</main>
+<?php pageEnd(); ?>

@@ -1,3 +1,3 @@
 <?php
 $eslug = 'test';
-include '../templates/event_template.php';
+require __DIR__ . '/../templates/event_template.php';

@@ -18,13 +18,23 @@ pageStart('Rankings', 'Rankings');
                 <h2><?= h($class['name']) ?><?= is_numeric($class['name']) ? ' kg division' : '' ?></h2>
                 <ul class="rank-list">
                     <?php foreach ($fighters as $fighter): ?>
+                        <?php $photo = media($fighter['photo'], ''); ?>
                         <li>
                             <?php if ((int) $fighter['ranking'] === 0): ?>
                                 <span class="rank-position champion" aria-label="Champion" title="Champion">C</span>
                             <?php else: ?>
                                 <span class="rank-position">#<?= (int) $fighter['ranking'] ?></span>
                             <?php endif; ?>
-                            <a href="<?= detailUrl('fighter', $fighter) ?>"><?= h($fighter['name']) ?></a>
+                            <a class="rank-fighter" href="<?= detailUrl('fighter', $fighter) ?>">
+                                <span class="rank-portrait" aria-hidden="true">
+                                    <?php if ($photo): ?>
+                                        <img src="<?= h($photo) ?>" alt="" loading="lazy" width="44" height="44">
+                                    <?php else: ?>
+                                        <?= h(fighterInitials((string) $fighter['name'])) ?>
+                                    <?php endif; ?>
+                                </span>
+                                <span><?= h($fighter['name']) ?></span>
+                            </a>
                             <span class="record"><?= h(record($fighter)) ?></span>
                         </li>
                     <?php endforeach; ?>

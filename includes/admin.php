@@ -132,6 +132,34 @@ function uploadImage(string $key, string $directory): ?string
     return $path;
 }
 
+function imageColumn(string $section): ?array
+{
+    return match ($section) {
+        'events' => ['banner', 'banners'],
+        'fighters' => ['photo', ''],
+        'news' => ['image_url', 'news_images'],
+        default => null,
+    };
+}
+
+/** Deletes an uploaded image once no row of that table references it any more. */
+function removeUnusedImage(string $section, ?string $file): void
+{
+    $image = imageColumn($section);
+    $file = $file ? basename(str_replace(chr(92), '/', $file)) : '';
+    if (!$image || $file === '' || $file === '.' || $file === '..') {
+        return;
+    }
+    [$column, $folder] = $image;
+    if (query("SELECT COUNT(*) FROM $section WHERE $column = ?", [$file])->fetchColumn() > 0) {
+        return;
+    }
+    $path = APP_ROOT . '/assets/uploads/' . ($folder === '' ? '' : $folder . '/') . $file;
+    if (is_file($path)) {
+        @unlink($path);
+    }
+}
+
 function applyRecord(int $first, int $second, ?string $result, int $direction): void
 {
     $changes = match ($result) {
@@ -211,12 +239,7 @@ function saveAdminRecord(string $section, string $pk, array $fields, int $id): i
             $data['slug'] = (mb_substr($slug, 0, 200) ?: rtrim($section, 's')) . '-' . bin2hex(random_bytes(5));
         }
 
-        $image = match ($section) {
-            'events' => ['banner', 'banners'],
-            'fighters' => ['photo', ''],
-            'news' => ['image_url', 'news_images'],
-            default => null,
-        };
+        $image = imageColumn($section);
         if ($image) {
             [$column, $folder] = $image;
             $upload = uploadImage($column, $folder);
@@ -250,6 +273,9 @@ function saveAdminRecord(string $section, string $pk, array $fields, int $id): i
             }
         }
         $pdo->commit();
+        if ($upload && $existing) {
+            removeUnusedImage($section, $existing[$image[0]] ?? null);
+        }
         return $id;
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) {
@@ -350,6 +376,10 @@ function deleteAdminRecord(string $section, string $pk, int $id): void
         }
         query("DELETE FROM $section WHERE $pk = ?", [$id]);
         $pdo->commit();
+        $image = imageColumn($section);
+        if ($image) {
+            removeUnusedImage($section, $row[$image[0]] ?? null);
+        }
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();

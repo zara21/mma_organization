@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 const APP_ROOT = __DIR__ . '/..';
-const APP_URL = '/mma_organization';
+define('APP_URL', getenv('MMA_APP_URL') !== false ? rtrim((string) getenv('MMA_APP_URL'), '/') : '/mma_organization');
 const EVENT_STATES = ['Upcoming', 'Live', 'Past'];
 const RESULTS = ['Pending', 'Win', 'Loss', 'Draw'];
 const NEWS_CATEGORIES = ['News', 'Live', 'Review', 'Schedule', 'Event', 'Announcement', 'Highlights', 'Interviews', 'Opinion'];
@@ -45,6 +45,31 @@ function query(string $sql, array $args = []): PDOStatement
 function input(array $source, string $key, string $default = ''): string
 {
     return isset($source[$key]) && is_scalar($source[$key]) ? trim((string) $source[$key]) : $default;
+}
+
+/** Builds a LIKE pattern that treats %, _ and \ in user input literally. */
+function likePattern(string $search): string
+{
+    return '%' . addcslashes($search, '%_' . chr(92)) . '%';
+}
+
+/** Simple per-IP throttle for sign-in attempts (5 failures per 15 minutes). */
+function loginThrottle(string $action): bool
+{
+    $file = sys_get_temp_dir() . '/mma_login_' . hash('sha256', $_SERVER['REMOTE_ADDR'] ?? 'cli');
+    $window = 900;
+    $attempts = array_filter(is_file($file) ? (array) json_decode((string) file_get_contents($file), true) : [],
+        static fn ($time) => is_int($time) && $time > time() - $window);
+    if ($action === 'fail') {
+        $attempts[] = time();
+    }
+    if ($action === 'reset') {
+        $attempts = [];
+    }
+    if ($action !== 'check') {
+        file_put_contents($file, json_encode(array_values($attempts)), LOCK_EX);
+    }
+    return count($attempts) >= 5;
 }
 
 function csrf(): string
@@ -132,8 +157,15 @@ function dateLabel(?string $value, string $format = 'M j, Y'): string
 
 function eventState(array $event): string
 {
-    return $event['status'] === 'Upcoming' && $event['event_date'] && strtotime($event['event_date']) <= time()
-        ? 'Past' : $event['status'];
+    $time = $event['event_date'] ? strtotime($event['event_date']) : false;
+    if ($event['status'] === 'Upcoming' && $time !== false && $time <= time()) {
+        return 'Past';
+    }
+    // A card marked Live that is still more than 12 hours away is not live yet.
+    if ($event['status'] === 'Live' && $time !== false && $time > time() + 43200) {
+        return 'Upcoming';
+    }
+    return $event['status'];
 }
 
 function detailUrl(string $type, array $row): string

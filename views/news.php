@@ -6,7 +6,7 @@ $search = input($_GET, 'search');
 if (!in_array($category, NEWS_CATEGORIES, true)) {
     $category = '';
 }
-$pattern = '%' . $search . '%';
+$pattern = likePattern($search);
 $args = [$category, $category, $pattern, $pattern];
 $filter = " WHERE status = 'active' AND (? = '' OR category = ?) AND (title LIKE ? OR COALESCE(tags, '') LIKE ?)";
 $count = (int) query('SELECT COUNT(*) FROM news' . $filter, $args)->fetchColumn();

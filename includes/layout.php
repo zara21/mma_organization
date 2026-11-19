@@ -9,9 +9,12 @@ function pageStart(string $title, string $active = '', bool $admin = false): voi
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#090909">
+    <meta name="theme-color" content="#0b0b0d">
     <title><?= h($title) ?> · MMA Organization</title>
-    <link rel="stylesheet" href="<?= url('/assets/css/site.css') ?>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,800&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="<?= url('/assets/css/site.css') ?>?v=2">
     <?php if ($admin): ?><link rel="stylesheet" href="<?= url('/assets/css/control.css') ?>"><?php endif; ?>
     <script src="<?= url('/assets/js/site.js') ?>" defer></script>
 </head>
@@ -20,7 +23,7 @@ function pageStart(string $title, string $active = '', bool $admin = false): voi
 <header class="topbar">
     <div class="shell topbar-inner">
         <a class="header-brand" href="<?= url() ?>" aria-label="MMA Organization home">
-            <span class="brand-mark">MMA</span><span class="brand-name">Organization</span>
+            <span class="brand-mark">MMA<i></i></span><span class="brand-name">Organization</span>
         </a>
         <nav id="site-navigation" class="main-nav" aria-label="Main navigation">
             <?php foreach ($nav as $name => $path): ?>
@@ -124,7 +127,7 @@ function fighterCard(array $fighter): void
             <div class="fighter-art">
                 <?php if ($photo): ?><img src="<?= h($photo) ?>" alt="" loading="lazy">
                 <?php else: ?><span class="fighter-initials" aria-hidden="true"><?= h(fighterInitials((string) $fighter['name'])) ?></span><?php endif; ?>
-                <?php if ($fighter['ranking'] !== null): ?><span class="rank-label"><?= (int) $fighter['ranking'] === 0 ? 'Champion' : '#' . (int) $fighter['ranking'] ?></span><?php endif; ?>
+                <?php if ($fighter['ranking'] !== null): ?><span class="rank-label<?= (int) $fighter['ranking'] === 0 ? ' is-champion' : '' ?>"><?= (int) $fighter['ranking'] === 0 ? 'Champion' : '#' . (int) $fighter['ranking'] ?></span><?php endif; ?>
             </div>
             <div class="card-copy">
                 <p class="eyebrow"><?= h($fighter['nationality'] ?: ($fighter['class_name'] ?? 'MMA Fighter')) ?></p>

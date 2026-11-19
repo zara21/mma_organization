@@ -4,7 +4,7 @@ require __DIR__ . '/../includes/app.php';
 $search = input($_GET, 'search');
 $division = (int) input($_GET, 'division');
 $classes = query('SELECT * FROM weight_classes ORDER BY weight_class_id')->fetchAll();
-$pattern = '%' . $search . '%';
+$pattern = likePattern($search);
 $args = [$division, $division, $pattern, $pattern];
 $filter = " WHERE (? = 0 OR f.weight_class_id = ?) AND (f.name LIKE ? OR COALESCE(f.nickname, '') LIKE ?)";
 $count = (int) query('SELECT COUNT(*) FROM fighters f' . $filter, $args)->fetchColumn();

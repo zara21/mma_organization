@@ -181,7 +181,7 @@ pageStart('Admin panel', '', true);
             <?php
             $search = input($_GET, 'search');
             $matches = ' WHERE ' . $nameColumn . ' LIKE ?';
-            $pattern = '%' . $search . '%';
+            $pattern = likePattern($search);
             $total = (int) query("SELECT COUNT(*) FROM $section" . $matches, [$pattern])->fetchColumn();
             $pages = max(1, (int) ceil($total / 25));
             $page = max(1, min($pages, (int) input($_GET, 'page', '1')));
@@ -202,7 +202,7 @@ pageStart('Admin panel', '', true);
                         <tr><td><?= h($entry[$nameColumn] ?: 'Recorded fight') ?></td>
                             <?php if ($section === 'events'): ?><td><?= h(eventState($entry)) ?></td><?php endif; ?>
                             <?php if ($section === 'news'): ?><td><?= $entry['status'] === 'active' ? 'Published' : 'Draft' ?></td><?php endif; ?>
-                            <?php if ($section === 'fighters'): ?><td><?= h($entry['ranking'] ?? 'Unranked') ?></td><?php endif; ?>
+                            <?php if ($section === 'fighters'): ?><td><?= $entry['ranking'] === null ? 'Unranked' : ((int) $entry['ranking'] === 0 ? 'Champion' : '#' . (int) $entry['ranking']) ?></td><?php endif; ?>
                             <td><a class="text-link" href="<?= url(adminPath($section, ['mode' => 'edit', 'id' => $entry[$pk]])) ?>">Edit</a></td></tr>
                     <?php endforeach; ?></tbody>
                 </table></div>

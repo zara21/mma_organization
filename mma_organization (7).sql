@@ -73,7 +73,7 @@ CREATE TABLE `admin_actions` (
   `action_type` varchar(100) DEFAULT NULL,
   `description` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -94,7 +94,7 @@ CREATE TABLE `events` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `additional_link` varchar(255) DEFAULT NULL,
   `status` enum('Upcoming','Live','Past') NOT NULL DEFAULT 'Upcoming'
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `events`
@@ -117,7 +117,7 @@ CREATE TABLE `event_fights` (
   `fighter1_id` int(11) NOT NULL,
   `fighter2_id` int(11) NOT NULL,
   `result` enum('Win','Loss','Draw','Pending') DEFAULT 'Pending'
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `event_fights`
@@ -160,7 +160,7 @@ CREATE TABLE `fighters` (
   `slug` varchar(255) NOT NULL,
   `weight_class_id` int(11) DEFAULT NULL,
   `ranking` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `fighters`
@@ -191,7 +191,7 @@ CREATE TABLE `fights` (
   `result` varchar(50) DEFAULT NULL,
   `method` varchar(50) DEFAULT NULL,
   `event_id` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -218,7 +218,7 @@ CREATE TABLE `news` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `is_featured` tinyint(1) DEFAULT 0,
   `comments_enabled` tinyint(1) DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `news`
@@ -248,7 +248,7 @@ CREATE TABLE `users` (
   `role` enum('user','admin') DEFAULT 'user',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `is_admin` tinyint(1) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `users`
@@ -273,7 +273,7 @@ INSERT INTO `users` (`user_id`, `username`, `password`, `email`, `role`, `create
 CREATE TABLE `weight_classes` (
   `weight_class_id` int(11) NOT NULL,
   `name` varchar(100) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `weight_classes`

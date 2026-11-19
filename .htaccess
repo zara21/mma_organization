@@ -6,6 +6,11 @@ Options -MultiViews
 
 RewriteEngine On
 
+# Never serve VCS/tooling folders (.git, .claude, .env …) or internal PHP folders.
+RewriteRule (^|/)\.(?!well-known/) - [F,L]
+RewriteRule ^(config|includes|templates|scripts|database)(/|$) - [F,L]
+RewriteRule ^README\.md$ - [F,L]
+
 RewriteCond %{THE_REQUEST} "\s/[^?\s]+\.php(?:[?\s])"
 RewriteRule ^index\.php$ /mma_organization/ [R=308,END]
 

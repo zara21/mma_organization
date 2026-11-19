@@ -10,13 +10,13 @@ if (!$fighter) {
 }
 canonicalizeDetailUrl('fighter', $fighter);
 $id = (int) $fighter['fighter_id'];
-$eventBouts = query('SELECT e.slug, e.title, e.status, e.event_date, ef.result, ef.fighter1_id,
+$eventBouts = query('SELECT e.slug, e.title, e.status, e.event_date, ef.result, ef.fighter1_id, ef.method, ef.finish_round, ef.finish_seconds,
                             a.slug AS first_slug, a.name AS first_name, b.slug AS second_slug, b.name AS second_name
                      FROM event_fights ef JOIN events e USING (event_id)
                      JOIN fighters a ON a.fighter_id = ef.fighter1_id JOIN fighters b ON b.fighter_id = ef.fighter2_id
                      WHERE ef.fighter1_id = ? OR ef.fighter2_id = ?', [$id, $id])->fetchAll();
 $recordedBouts = query("SELECT e.slug, COALESCE(e.title, f.location, 'Recorded fight') AS title, 'Past' AS status,
-                              f.date AS event_date, f.result, f.fighter1_id, a.slug AS first_slug, a.name AS first_name,
+                              f.date AS event_date, f.result, f.fighter1_id, f.method, f.finish_round, f.finish_seconds, a.slug AS first_slug, a.name AS first_name,
                               b.slug AS second_slug, b.name AS second_name
                        FROM fights f LEFT JOIN events e USING (event_id)
                        JOIN fighters a ON a.fighter_id = f.fighter1_id JOIN fighters b ON b.fighter_id = f.fighter2_id
@@ -64,7 +64,10 @@ pageStart($fighter['name'], 'Fighters');
                     <td><?php if ($bout['slug']): ?><a href="<?= detailUrl('event', $bout) ?>"><?= h($bout['title']) ?></a><?php else: ?><?= h($bout['title']) ?><?php endif; ?></td>
                     <td><a href="<?= detailUrl('fighter', ['slug' => $bout[$opponent . '_slug']]) ?>"><?= h($bout[$opponent . '_name']) ?></a></td>
                     <td><?= h(dateLabel($bout['event_date'])) ?></td>
-                    <td><?php outcomeBadge(boutOutcome($bout['result'], $first, eventState($bout))); ?></td>
+                    <td>
+                        <?php outcomeBadge(boutOutcome($bout['result'], $first, eventState($bout))); ?>
+                        <?php if ($details = boutDetails($bout)): ?><small class="bout-history-details muted"><?= h($details) ?></small><?php endif; ?>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>

@@ -13,7 +13,7 @@ $title = $event['e_name'] ?: $event['title'];
 $banner = media($event['banner'], 'banners');
 $ticket = $state === 'Upcoming' ? httpLink($event['ticket_link']) : null;
 $extra = httpLink($event['additional_link']);
-$fights = eventFights((int) $event['event_id']);
+$fights = array_merge(eventFights((int) $event['event_id']), recordedEventFights((int) $event['event_id']));
 $mainFirst = (int) $event['main_fighter1_id'];
 $mainSecond = (int) $event['main_fighter2_id'];
 $isMain = static fn (array $fight): bool =>
@@ -61,6 +61,7 @@ pageStart($title, 'Events');
                             </span>
                         </a>
                     <?php endforeach; ?>
+                    <?php if ($details = boutDetails($fight)): ?><p class="bout-details muted"><?= h($details) ?></p><?php endif; ?>
                 </article>
             <?php endforeach; ?>
         </div>

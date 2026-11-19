@@ -4,7 +4,8 @@ declare(strict_types=1);
 const APP_ROOT = __DIR__ . '/..';
 define('APP_URL', getenv('MMA_APP_URL') !== false ? rtrim((string) getenv('MMA_APP_URL'), '/') : '/mma_organization');
 const EVENT_STATES = ['Upcoming', 'Live', 'Past'];
-const RESULTS = ['Pending', 'Win', 'Loss', 'Draw'];
+const RESULTS = ['Pending', 'Win', 'Loss', 'Draw', 'No contest'];
+const EVENT_LIVE_WINDOW_SECONDS = 8 * 60 * 60;
 const NEWS_CATEGORIES = ['News', 'Live', 'Review', 'Schedule', 'Event', 'Announcement', 'Highlights', 'Interviews', 'Opinion'];
 
 date_default_timezone_set(getenv('MMA_TIMEZONE') ?: 'Asia/Tbilisi');
@@ -110,6 +111,18 @@ function isAdmin(?array $user): bool
     return $user && ((int) $user['is_admin'] === 1 || $user['role'] === 'admin');
 }
 
+function authenticateAccount(string $email, string $password): ?array
+{
+    $matches = [];
+    foreach (query('SELECT user_id, password, is_admin, role FROM users WHERE email = ? ORDER BY user_id', [$email]) as $account) {
+        if (password_verify($password, $account['password'])) {
+            unset($account['password']);
+            $matches[] = $account;
+        }
+    }
+    return count($matches) === 1 ? $matches[0] : null;
+}
+
 function requireAdmin(): array
 {
     $user = currentUser();
@@ -155,17 +168,17 @@ function dateLabel(?string $value, string $format = 'M j, Y'): string
     return $time === false ? 'Date to be announced' : date($format, $time);
 }
 
-function eventState(array $event): string
+function eventState(array $event, ?int $now = null): string
 {
-    $time = $event['event_date'] ? strtotime($event['event_date']) : false;
-    if ($event['status'] === 'Upcoming' && $time !== false && $time <= time()) {
+    if ($event['status'] === 'Past') {
         return 'Past';
     }
-    // A card marked Live that is still more than 12 hours away is not live yet.
-    if ($event['status'] === 'Live' && $time !== false && $time > time() + 43200) {
+    $now ??= time();
+    $time = $event['event_date'] ? strtotime($event['event_date']) : false;
+    if ($time === false || $time > $now) {
         return 'Upcoming';
     }
-    return $event['status'];
+    return $now - $time < EVENT_LIVE_WINDOW_SECONDS ? 'Live' : 'Past';
 }
 
 function detailUrl(string $type, array $row): string
@@ -197,6 +210,7 @@ function resultLabel(?string $result, bool $first): string
         'Win', 'Fighter 1 Wins' => $first ? 'Win' : 'Loss',
         'Loss', 'Fighter 2 Wins' => $first ? 'Loss' : 'Win',
         'Draw' => 'Draw',
+        'No contest', 'No Contest', 'NC' => 'No contest',
         default => 'Pending',
     };
 }
@@ -204,7 +218,28 @@ function resultLabel(?string $result, bool $first): string
 function boutOutcome(?string $result, bool $first, string $state): string
 {
     $outcome = resultLabel($result, $first);
-    return $outcome === 'Pending' && $state === 'Upcoming' ? 'Scheduled' : $outcome;
+    if ($outcome !== 'Pending') {
+        return $outcome;
+    }
+    return match ($state) {
+        'Upcoming' => 'Scheduled',
+        'Past' => 'Result not recorded',
+        default => 'Pending',
+    };
+}
+
+function finishTime(?int $seconds): string
+{
+    return $seconds === null ? '' : sprintf('%d:%02d', intdiv($seconds, 60), $seconds % 60);
+}
+
+function boutDetails(array $bout): string
+{
+    return implode(' · ', array_filter([
+        $bout['method'] ?? null,
+        isset($bout['finish_round']) ? 'Round ' . $bout['finish_round'] : null,
+        finishTime(isset($bout['finish_seconds']) ? (int) $bout['finish_seconds'] : null),
+    ]));
 }
 
 function eventFights(int $event): array
@@ -213,6 +248,14 @@ function eventFights(int $event): array
                          b.name AS second_name, b.slug AS second_slug, b.photo AS second_photo
                   FROM event_fights ef JOIN fighters a ON a.fighter_id = ef.fighter1_id
                   JOIN fighters b ON b.fighter_id = ef.fighter2_id WHERE ef.event_id = ? ORDER BY ef.fight_id', [$event])->fetchAll();
+}
+
+function recordedEventFights(int $event): array
+{
+    return query('SELECT f.*, a.name AS first_name, a.slug AS first_slug, a.photo AS first_photo,
+                         b.name AS second_name, b.slug AS second_slug, b.photo AS second_photo
+                  FROM fights f JOIN fighters a ON a.fighter_id = f.fighter1_id
+                  JOIN fighters b ON b.fighter_id = f.fighter2_id WHERE f.event_id = ? ORDER BY f.fight_id', [$event])->fetchAll();
 }
 
 require_once APP_ROOT . '/includes/layout.php';

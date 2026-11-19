@@ -45,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (loginThrottle('check')) {
         $error = 'Too many failed sign-in attempts. Wait 15 minutes and try again.';
     } else {
-        $account = query('SELECT user_id, password, is_admin, role FROM users WHERE email = ? LIMIT 1', [$email])->fetch();
-        if ($account && password_verify($password, $account['password'])) {
+        $account = authenticateAccount($email, $password);
+        if ($account) {
             loginThrottle('reset');
             session_regenerate_id(true);
             $_SESSION = ['user_id' => $account['user_id']];

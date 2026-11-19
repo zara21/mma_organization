@@ -26,7 +26,7 @@ $eventPlan = [
     ['Summer Series', -49, 'Past'],
     ['Capital Clash', -28, 'Past'],
     ['Autumn Finals', -7, 'Past'],
-    ['Arena Live', 0, 'Live'],
+    ['Arena Live', -3, 'Past'],
     ['Winter Kickoff', 9, 'Upcoming'],
     ['Coastal Series', 23, 'Upcoming'],
     ['New Year Card', 45, 'Upcoming'],
@@ -36,7 +36,7 @@ $eventPlan = [
 
 $storyPlan = [
     ['The upcoming fight card is set', 'Announcement', 'Explore the test event schedule and open the next event to see its main card.'],
-    ['A guide to the rankings', 'News', 'Seven test divisions each have a champion and five ranked contenders. Open the rankings to compare their records.'],
+    ['A guide to the rankings', 'News', 'The rankings show the leading fighters in each weight class. Open the rankings to compare their records.'],
     ['Capital Clash results roundup', 'Review', 'The completed test card includes wins, losses and a draw. Individual results are also visible on the athlete profiles.'],
     ['Three fights to revisit', 'Highlights', 'Open the archive and compare how each fight is shown on the event card and on both athlete profiles.'],
     ['The winter schedule is out', 'Schedule', 'The next group of simulated events includes both opening bouts and featured matchups.'],
@@ -73,6 +73,104 @@ function fillDemoImage(string $table, string $column, string $slug, string $file
         return 0;
     }
     return query("UPDATE $table SET $column = ? WHERE slug = ? AND ($column IS NULL OR $column = '')", [$file, $slug])->rowCount();
+}
+
+function seedRankingSeason(array $portraits, array $banners, DateTimeImmutable $today, array &$created, array &$images): void
+{
+    global $pdo;
+    $givenNames = ['Levan', 'Rati', 'Nika', 'Irakli', 'Sandro', 'Davit', 'Luka', 'Mateo', 'Elian', 'Nolan', 'Rafael', 'Diego', 'Emil', 'Kian', 'Miro', 'Dario'];
+    $surnames = ['Areshi', 'Darsavi', 'Melvani', 'Korlani', 'Vaseri', 'Rinel', 'Soreti', 'Navaro', 'Taveli', 'Mavrel', 'Lioran', 'Meravi', 'Kortan', 'Zareli', 'Rensal', 'Velari'];
+    $outcomes = ['Win', 'Loss', 'Win', 'Draw', 'Loss', 'Win', 'Loss'];
+    $cards = array_fill(0, 15, []);
+    $classes = query('SELECT weight_class_id, name FROM weight_classes ORDER BY weight_class_id')->fetchAll();
+
+    foreach ($classes as $class) {
+        $divisionId = (int) $class['weight_class_id'];
+        $fighters = query('SELECT fighter_id, slug, ranking FROM fighters WHERE weight_class_id = ? ORDER BY fighter_id', [$divisionId])->fetchAll();
+        $testRoster = array_slice(array_values(array_filter($fighters, static fn ($fighter) => str_starts_with($fighter['slug'], 'demo-'))), 0, 11);
+        $takenRanks = [];
+        foreach ($fighters as $fighter) {
+            if ($fighter['ranking'] !== null) {
+                $takenRanks[(int) $fighter['ranking']] = true;
+            }
+        }
+        $nextRank = 0;
+        $nameIndex = 0;
+        $weight = is_numeric($class['name']) ? (float) $class['name'] : null;
+        if (preg_match('/\b(\d+(?:\.\d+)?)\s*kg\b/i', $class['name'], $match)) {
+            $weight = (float) $match[1];
+        }
+        if ($weight !== null && ($weight <= 0 || $weight > 999.9)) {
+            $weight = null;
+        }
+
+        $rotation = [];
+        for ($slot = 0; $slot < 11; $slot++) {
+            $fighter = $testRoster[$slot] ?? null;
+            while (isset($takenRanks[$nextRank])) {
+                $nextRank++;
+            }
+            if (!$fighter) {
+                do {
+                    $index = ($divisionId - 1) * 11 + $nameIndex++;
+                    $name = $givenNames[$index % count($givenNames)] . ' ' .
+                        $surnames[(intdiv($index, count($givenNames)) + $index * 5) % count($surnames)];
+                    $slug = 'demo-' . strtolower(str_replace(' ', '-', $name)) . '-' . $divisionId;
+                } while (query('SELECT fighter_id FROM fighters WHERE slug = ? LIMIT 1', [$slug])->fetchColumn());
+                query('INSERT INTO fighters (name, weight, slug, weight_class_id, ranking) VALUES (?, ?, ?, ?, ?)',
+                    [$name, $weight, $slug, $divisionId, $nextRank]);
+                $fighter = ['fighter_id' => (int) $pdo->lastInsertId(), 'slug' => $slug, 'ranking' => $nextRank];
+                $takenRanks[$nextRank++] = true;
+                $created['fighters']++;
+            } elseif ($fighter['ranking'] === null) {
+                query('UPDATE fighters SET ranking = ? WHERE fighter_id = ?', [$nextRank, $fighter['fighter_id']]);
+                $takenRanks[$nextRank++] = true;
+            }
+            $rotation[] = (int) $fighter['fighter_id'];
+            $portrait = $portraits[($divisionId + $slot) % count($portraits)];
+            $images['fighter photos'] += fillDemoImage('fighters', 'photo', $fighter['slug'], $portrait, '');
+        }
+
+        // A bye makes the roster even. Rotating opponents gives everyone two or three bouts.
+        $rotation[] = null;
+        for ($round = 0; $round < 3; $round++) {
+            $cardIndex = $round * 5;
+            for ($slot = 0; $slot < 6; $slot++) {
+                $first = $rotation[$slot];
+                $second = $rotation[11 - $slot];
+                if ($first !== null && $second !== null) {
+                    $cards[$cardIndex++][] = [$first, $second];
+                }
+            }
+            $last = array_pop($rotation);
+            array_splice($rotation, 1, 0, [$last]);
+        }
+    }
+
+    foreach ($cards as $index => $card) {
+        if (!$card) {
+            continue;
+        }
+        $slug = sprintf('demo-league-fight-night-%02d', $index + 1);
+        if (query('SELECT event_id FROM events WHERE slug = ?', [$slug])->fetchColumn()) {
+            continue;
+        }
+        [$mainFirst, $mainSecond] = $card[$index % count($card)];
+        $title = 'League Fight Night ' . ($index + 1);
+        $daysAgo = (count($cards) - $index) * 4 + 3;
+        $date = $today->modify("-$daysAgo days")->setTime(19, 30)->format('Y-m-d H:i:s');
+        query("INSERT INTO events (title, e_name, slug, event_date, main_fighter1_id, main_fighter2_id, banner, status)
+               VALUES (?, ?, ?, ?, ?, ?, '', 'Past')", [$title, $title, $slug, $date, $mainFirst, $mainSecond]);
+        $eventId = (int) $pdo->lastInsertId();
+        $created['events']++;
+        $images['event banners'] += fillDemoImage('events', 'banner', $slug, $banners[$index % count($banners)], 'banners');
+        foreach ($card as $slot => [$first, $second]) {
+            $result = $outcomes[($index * 3 + $slot) % count($outcomes)];
+            query('INSERT INTO event_fights (event_id, fighter1_id, fighter2_id, result) VALUES (?, ?, ?, ?)', [$eventId, $first, $second, $result]);
+            applyRecord($first, $second, $result, 1);
+            $created['bouts']++;
+        }
+    }
 }
 
 $created = ['divisions' => 0, 'fighters' => 0, 'events' => 0, 'bouts' => 0, 'articles' => 0];
@@ -131,6 +229,7 @@ try {
     }
 
     $today = new DateTimeImmutable('today');
+    seedRankingSeason($portraits, $banners, $today, $created, $images);
     $scoredOutcomes = ['Win', 'Loss', 'Win', 'Draw', 'Loss', 'Win', 'Loss'];
     foreach ($eventPlan as $index => [$name, $offset, $status]) {
         $slug = sprintf('demo-fight-night-%02d', $index + 1);
@@ -172,6 +271,10 @@ try {
         $created['articles']++;
         $images['article covers'] += fillDemoImage('news', 'image_url', $slug, $covers[$index], 'news_images');
     }
+    query("UPDATE news SET content = REPLACE(content, ?, ?) WHERE slug = 'demo-story-02' AND content LIKE ?",
+        ['Seven test divisions each have a champion and five ranked contenders.',
+            'The rankings show the leading fighters in each weight class.',
+            '%Seven test divisions each have a champion and five ranked contenders.%']);
 
     $pdo->commit();
 } catch (Throwable $error) {

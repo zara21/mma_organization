@@ -1,9 +1,70 @@
 <?php
 declare(strict_types=1);
 
+const MAX_FIGHTER_RANK = 100000;
+
 function field(string $label, string $type = 'text', bool $required = false, int|float|array|null $options = null): array
 {
     return compact('label', 'type', 'required', 'options');
+}
+
+function fightDetailFields(): array
+{
+    return [
+        'method' => field('Method', 'text', false, 50),
+        'finish_round' => field('Finish round', 'number', false, 99),
+        'finish_time' => field('Time into round (M:SS)', 'text', false, 5),
+    ];
+}
+
+function validatedFightDetails(array $data): array
+{
+    $time = $data['finish_time'];
+    if ($data['finish_round'] !== null && (int) $data['finish_round'] < 1) {
+        throw new DomainException('Enter a finish round of at least 1.');
+    }
+    if ($time !== null && !preg_match('/^(\d{1,2}):([0-5]\d)$/D', $time, $parts)) {
+        throw new DomainException('Enter the finish time as minutes and seconds, for example 2:35.');
+    }
+    return [
+        'method' => $data['method'],
+        'finish_round' => $data['finish_round'] === null ? null : (int) $data['finish_round'],
+        'finish_seconds' => $time === null ? null : (int) $parts[1] * 60 + (int) $parts[2],
+    ];
+}
+
+function logAdminAction(?int $adminId, string $type, string $description): void
+{
+    query('INSERT INTO admin_actions (admin_id, action_type, description) VALUES (?, ?, ?)', [$adminId, $type, $description]);
+}
+
+function adminRankLabel(?int $rank): string
+{
+    return match ($rank) {
+        null => 'Unranked',
+        0 => 'Champion',
+        default => '#' . $rank,
+    };
+}
+
+function adminBoutLabel(array $bout): string
+{
+    $result = match ($bout['result'] ?? null) {
+        'Win', 'Fighter 1 Wins' => 'Fighter 1 wins',
+        'Loss', 'Fighter 2 Wins' => 'Fighter 2 wins',
+        'Draw' => 'Draw',
+        'No contest', 'No Contest', 'NC' => 'No contest',
+        default => 'Pending',
+    };
+    $details = boutDetails($bout);
+    return $details === '' ? $result : $result . ' · ' . $details;
+}
+
+function fightDetailsChanged(array $old, array $new): bool
+{
+    return $old['method'] !== $new['method'] ||
+        $old['finish_round'] !== $new['finish_round'] ||
+        $old['finish_seconds'] !== $new['finish_seconds'];
 }
 
 function adminResources(): array
@@ -34,7 +95,7 @@ function adminResources(): array
             'losses' => field('Losses', 'number', true, 100000),
             'draws' => field('Draws', 'number', true, 100000),
             'weight_class_id' => field('Weight class', 'select', false, $classes),
-            'ranking' => field('Ranking (0 for champion)', 'number', false, 100000),
+            'ranking' => field('Ranking (0 for champion)', 'number', false, MAX_FIGHTER_RANK),
             'photo' => field('Fighter photo', 'file'),
         ]],
         'news' => ['News', 'news_id', 'title', [
@@ -57,15 +118,55 @@ function adminResources(): array
             'fighter2_id' => field('Fighter 2', 'select', true, $fighters),
             'date' => field('Fight date', 'date', true),
             'location' => field('Location', 'text', true, 100),
-            'result' => field('Result', 'select', true, ['Fighter 1 Wins' => 'Fighter 1 wins', 'Fighter 2 Wins' => 'Fighter 2 wins', 'Draw' => 'Draw']),
-            'method' => field('Method', 'text', false, 50),
-        ]],
+            'result' => field('Result', 'select', true, ['Fighter 1 Wins' => 'Fighter 1 wins', 'Fighter 2 Wins' => 'Fighter 2 wins', 'Draw' => 'Draw', 'No contest' => 'No contest']),
+        ] + fightDetailFields()],
     ];
 }
 
 function adminPath(string $section = '', array $params = []): string
 {
     return '/views/admin' . ($section ? '?' . http_build_query(['section' => $section] + $params) : '');
+}
+
+function rankingVersion(array $fighters): string
+{
+    $ranks = array_column($fighters, 'ranking', 'fighter_id');
+    ksort($ranks);
+    return hash('sha256', json_encode($ranks, JSON_THROW_ON_ERROR));
+}
+
+function saveDivisionRankings(int $division, array $submitted, string $version, ?int $adminId = null): void
+{
+    global $pdo;
+
+    $pdo->beginTransaction();
+    try {
+        $fighters = query('SELECT fighter_id, name, ranking FROM fighters WHERE weight_class_id = ? ORDER BY fighter_id FOR UPDATE', [$division])->fetchAll();
+        if (!$fighters || count($fighters) !== count($submitted) || rankingVersion($fighters) !== $version) {
+            throw new DomainException('This division has changed. Review the latest rankings before saving.');
+        }
+
+        foreach ($fighters as $fighter) {
+            $id = (int) $fighter['fighter_id'];
+            $value = $submitted[$id] ?? null;
+            if (!is_string($value) || ($value !== '' && (!ctype_digit($value) || (int) $value > MAX_FIGHTER_RANK))) {
+                throw new DomainException('Enter a whole number from 0 to ' . MAX_FIGHTER_RANK . ', or leave the position blank.');
+            }
+            $rank = $value === '' ? null : (int) $value;
+            $previous = $fighter['ranking'] === null ? null : (int) $fighter['ranking'];
+            if ($rank !== $previous) {
+                query('UPDATE fighters SET ranking = ? WHERE fighter_id = ?', [$rank, $id]);
+                logAdminAction($adminId, 'Ranking', $fighter['name'] . ' (fighter #' . $id . ', division #' . $division . ') · ' .
+                    adminRankLabel($previous) . ' → ' . adminRankLabel($rank));
+            }
+        }
+        $pdo->commit();
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $error;
+    }
 }
 
 function validatedFields(array $fields): array
@@ -183,7 +284,7 @@ function ensureMainBout(int $id, int $first, int $second): void
     }
 }
 
-function saveAdminRecord(string $section, string $pk, array $fields, int $id): int
+function saveAdminRecord(string $section, string $pk, array $fields, int $id, ?int $adminId = null): int
 {
     global $pdo;
     $data = validatedFields($fields);
@@ -218,6 +319,8 @@ function saveAdminRecord(string $section, string $pk, array $fields, int $id): i
             throw new DomainException('That weight class already exists.');
         }
         if ($section === 'fights') {
+            $data = array_replace($data, validatedFightDetails($data));
+            unset($data['finish_time']);
             if ((int) $data['fighter1_id'] === (int) $data['fighter2_id']) {
                 throw new DomainException('Choose two different fighters.');
             }
@@ -271,6 +374,26 @@ function saveAdminRecord(string $section, string $pk, array $fields, int $id): i
             if ($changed) {
                 applyRecord((int) $data['fighter1_id'], (int) $data['fighter2_id'], $data['result'], 1);
             }
+            $resultChange = adminBoutLabel($data);
+            $previousResult = $existing ? adminBoutLabel($existing) : 'New result';
+            if ($changed || fightDetailsChanged($existing, $data) || (int) $existing['event_id'] !== (int) $data['event_id']) {
+                logAdminAction($adminId, 'Fight result', 'Recorded fight #' . $id . ' (event #' . $data['event_id'] . ') · ' .
+                    $previousResult . ' → ' . $resultChange);
+            }
+        }
+        if ($section === 'fighters') {
+            $previousRank = isset($existing['ranking']) ? (int) $existing['ranking'] : null;
+            $rank = $data['ranking'] === null ? null : (int) $data['ranking'];
+            $previousDivision = (int) ($existing['weight_class_id'] ?? 0);
+            $division = (int) $data['weight_class_id'];
+            if ($previousRank !== $rank || ($rank !== null && $previousDivision !== $division)) {
+                logAdminAction($adminId, 'Ranking', $data['name'] . ' (fighter #' . $id . ') · ' .
+                    adminRankLabel($previousRank) . " (division #$previousDivision) → " . adminRankLabel($rank) . " (division #$division)");
+            }
+        }
+        if ($section === 'news' && $data['status'] !== ($existing['status'] ?? null)) {
+            logAdminAction($adminId, 'Article status', $data['title'] . ' (article #' . $id . ') · ' .
+                publicationStatus($existing['status'] ?? null) . ' → ' . publicationStatus($data['status']));
         }
         $pdo->commit();
         if ($upload && $existing) {
@@ -295,7 +418,16 @@ function recordedPair(int $event, int $first, int $second): bool
         [$event, $first, $second, $second, $first])->fetch();
 }
 
-function saveFightCard(int $eventId, string $operation): void
+function publicationStatus(?string $status): string
+{
+    return match ($status) {
+        'active' => 'Published',
+        'inactive' => 'Draft',
+        default => 'New article',
+    };
+}
+
+function saveFightCard(int $eventId, string $operation, ?int $adminId = null): void
 {
     global $pdo;
     $pdo->beginTransaction();
@@ -323,6 +455,7 @@ function saveFightCard(int $eventId, string $operation): void
             $first = (int) $fight['fighter1_id'];
             $second = (int) $fight['fighter2_id'];
             $previous = $fight['result'];
+            $label = $event['title'] . ' (fight #' . $id . ') · ';
             if ($operation === 'remove_bout') {
                 $main = [(int) $event['main_fighter1_id'], (int) $event['main_fighter2_id']];
                 if (in_array($main, [[$first, $second], [$second, $first]], true)) {
@@ -330,15 +463,27 @@ function saveFightCard(int $eventId, string $operation): void
                 }
                 applyRecord($first, $second, $previous, -1);
                 query('DELETE FROM event_fights WHERE fight_id = ?', [$id]);
+                if ($previous && $previous !== 'Pending') {
+                    logAdminAction($adminId, 'Fight result', $label . adminBoutLabel($fight) . ' → Removed');
+                }
             } else {
                 $result = input($_POST, 'result');
                 if (!in_array($result, RESULTS, true)) {
                     throw new DomainException('Choose a valid fight result.');
                 }
+                $details = $result === 'Pending'
+                    ? ['method' => null, 'finish_round' => null, 'finish_seconds' => null]
+                    : validatedFightDetails(validatedFields(fightDetailFields()));
                 if ($result !== $previous) {
                     applyRecord($first, $second, $previous, -1);
                     applyRecord($first, $second, $result, 1);
-                    query('UPDATE event_fights SET result = ? WHERE fight_id = ?', [$result, $id]);
+                }
+                $oldLabel = adminBoutLabel($fight);
+                $newLabel = adminBoutLabel(['result' => $result] + $details);
+                if ($result !== $previous || fightDetailsChanged($fight, $details)) {
+                    query('UPDATE event_fights SET result = ?, method = ?, finish_round = ?, finish_seconds = ? WHERE fight_id = ?',
+                        [$result, $details['method'], $details['finish_round'], $details['finish_seconds'], $id]);
+                    logAdminAction($adminId, 'Fight result', $label . $oldLabel . ' → ' . $newLabel);
                 }
             }
         }
@@ -351,7 +496,7 @@ function saveFightCard(int $eventId, string $operation): void
     }
 }
 
-function deleteAdminRecord(string $section, string $pk, int $id): void
+function deleteAdminRecord(string $section, string $pk, int $id, ?int $adminId = null): void
 {
     global $pdo;
     $pdo->beginTransaction();
@@ -369,10 +514,19 @@ function deleteAdminRecord(string $section, string $pk, int $id): void
             }
             foreach (eventFights($id) as $fight) {
                 applyRecord((int) $fight['fighter1_id'], (int) $fight['fighter2_id'], $fight['result'], -1);
+                if ($fight['result'] && $fight['result'] !== 'Pending') {
+                    logAdminAction($adminId, 'Fight result', $row['title'] . ' (fight #' . $fight['fight_id'] . ') · ' .
+                        adminBoutLabel($fight) . ' → Removed with event');
+                }
             }
         }
         if ($section === 'fights') {
             applyRecord((int) $row['fighter1_id'], (int) $row['fighter2_id'], $row['result'], -1);
+            logAdminAction($adminId, 'Fight result', 'Recorded fight #' . $id . ' · ' . adminBoutLabel($row) . ' → Removed');
+        }
+        if ($section === 'news') {
+            logAdminAction($adminId, 'Article status', $row['title'] . ' (article #' . $id . ') · ' .
+                publicationStatus($row['status']) . ' → Removed');
         }
         query("DELETE FROM $section WHERE $pk = ?", [$id]);
         $pdo->commit();

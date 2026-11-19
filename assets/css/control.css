@@ -15,13 +15,34 @@
 .metric strong { color: var(--text); font-family: var(--display); font-size: 2.1rem; line-height: 1; font-weight: 800; }
 .admin-panel { margin-bottom: .9rem; padding: clamp(.85rem, 3vw, 1.5rem); }
 .admin-panel .table-wrap { border: 1px solid var(--line); border-radius: 10px; }
+.ranking-editor { display: grid; gap: .85rem; justify-items: start; }
+.ranking-editor .table-wrap { width: 100%; }
+.ranking-editor input[type="number"] { width: min(7rem, 100%); }
+.ranking-athlete { display: flex; align-items: center; gap: .6rem; overflow-wrap: anywhere; }
+.rank-swap {
+    flex: 0 0 44px;
+    min-height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--raised);
+    cursor: grab;
+    touch-action: none;
+}
+.rank-swap::before { content: ""; display: block; width: 10px; height: 15px; margin: auto; background: radial-gradient(circle, var(--muted) 1px, transparent 1.5px) 0 0 / 5px 5px; }
+.rank-swap:hover, .rank-swap[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.ranking-editor .rank-grabbed td { background: var(--raised); }
+.ranking-editor .rank-drop-target td { background: var(--accent-soft); }
+.rank-grabbed .rank-swap { cursor: grabbing; }
+.rank-swap-status:empty { position: absolute; }
+.rank-swap-status:not(:empty) { font-size: .9rem; }
 .admin-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem 1rem; margin-top: 1.15rem; }
 .admin-form .wide { grid-column: 1 / -1; }
 .delete-form { margin-top: 1rem; }
 .inline-form { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; max-width: 100%; }
 .inline-form label { flex: 1 1 160px; }
 .admin-bout { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; padding-block: .75rem; border-bottom: 1px solid var(--line); }
-.admin-bout .inline-form { flex: 1 1 300px; }
+.admin-result-form { flex: 1 1 480px; min-width: 0; display: grid; gap: .65rem; justify-items: start; }
+.admin-result-fields { display: grid; width: 100%; grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr)); gap: .65rem; }
 .add-bout { margin-top: 1rem; }
 @media (max-width: 820px) {
     .admin-shell { grid-template-columns: 1fr; padding-top: 1rem; }

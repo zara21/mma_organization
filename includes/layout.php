@@ -115,7 +115,7 @@ function fighterInitials(string $name): string
 
 function outcomeBadge(string $outcome): void
 {
-    echo '<span class="outcome outcome-' . h(strtolower($outcome)) . '">' . h($outcome) . '</span>';
+    echo '<span class="outcome outcome-' . h(strtolower(str_replace(' ', '-', $outcome))) . '">' . h($outcome) . '</span>';
 }
 
 function fighterCard(array $fighter): void

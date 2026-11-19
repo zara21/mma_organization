@@ -267,6 +267,8 @@ textarea { resize: vertical; line-height: 1.55; }
 .bout-list { display: grid; gap: .75rem; }
 .bout { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .75rem; padding: 1rem; }
 .bout-label { grid-column: 1 / -1; text-align: center; }
+.bout-details { grid-column: 1 / -1; text-align: center; font-size: .9rem; }
+.bout-history-details { display: block; margin-top: .3rem; font-size: .875rem; }
 .bout:has(.bout-label) { border-color: rgb(229 50 45 / 60%); background: linear-gradient(180deg, #221516, var(--panel) 65%); }
 .bout-fighter { display: flex; align-items: center; justify-content: center; gap: .75rem; overflow-wrap: anywhere; }
 .bout-fighter img { width: clamp(54px, 8vw, 88px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 50% 100%, rgb(229 50 45 / 30%), var(--raised) 70%); object-fit: cover; object-position: top; }
@@ -278,6 +280,7 @@ textarea { resize: vertical; line-height: 1.55; }
 .outcome-win { border-color: #39765b; background: #203a31; color: #a9eace; }
 .outcome-loss { border-color: #915363; background: #442932; color: #ffc1c9; }
 .outcome-draw { border-color: #7e683a; background: #3e3425; color: #f5d694; }
+.outcome-no-contest { border-color: #6e608a; background: #312943; color: #ddd0fa; }
 
 .profile-hero { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.3fr); align-items: stretch; overflow: hidden; }
 .profile-hero .fighter-art { height: 100%; min-height: 360px; }

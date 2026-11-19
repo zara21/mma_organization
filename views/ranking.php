@@ -1,8 +1,9 @@
 <?php
-require __DIR__ . '/../includes/app.php';
+require_once __DIR__ . '/../includes/app.php';
 
 $classes = query('SELECT * FROM weight_classes ORDER BY weight_class_id')->fetchAll();
-$ranked = query('SELECT * FROM fighters WHERE ranking IS NOT NULL AND weight_class_id IS NOT NULL ORDER BY ranking, name')->fetchAll();
+$ranked = query('SELECT * FROM fighters WHERE ranking BETWEEN 0 AND 10 AND weight_class_id IS NOT NULL
+                 ORDER BY ranking, name, fighter_id')->fetchAll();
 $groups = [];
 foreach ($ranked as $fighter) {
     $groups[$fighter['weight_class_id']][] = $fighter;
@@ -10,7 +11,7 @@ foreach ($ranked as $fighter) {
 pageStart('Rankings', 'Rankings');
 ?>
 <main class="shell section">
-    <?php pageHeading('Rankings', 'Champions and ranked fighters by weight class.'); ?>
+    <?php pageHeading('Rankings', 'Champions and positions #1–#10 in each weight class.'); ?>
     <div class="ranking-grid">
         <?php foreach ($classes as $class): ?>
             <?php $fighters = $groups[$class['weight_class_id']] ?? []; if (!$fighters) continue; ?>
